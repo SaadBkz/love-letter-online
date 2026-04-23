@@ -1,27 +1,36 @@
-import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import type { Metadata, Viewport } from 'next';
+import { Cinzel, Geist_Mono, Lora } from 'next/font/google';
+import { Toaster } from 'sonner';
+import './globals.css';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+const cinzel = Cinzel({
+  variable: '--font-cinzel',
+  subsets: ['latin'],
+  weight: ['400', '600', '700'],
+});
+
+const lora = Lora({
+  variable: '--font-lora',
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  style: ['normal', 'italic'],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
 });
 
 export const metadata: Metadata = {
-  title: "Love Letter Online",
-  description: "Jeu de cartes Love Letter en ligne, multijoueur temps réel.",
+  title: 'Love Letter Online',
+  description: 'Jeu de cartes Love Letter en ligne, multijoueur temps réel.',
 };
 
 export const viewport: Viewport = {
-  width: "device-width",
+  width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#18181b",
+  themeColor: '#3d0e13',
 };
 
 export default function RootLayout({
@@ -32,9 +41,22 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${cinzel.variable} ${lora.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <Toaster
+          position="top-center"
+          theme="dark"
+          toastOptions={{
+            style: {
+              background: 'var(--color-ink)',
+              color: 'var(--color-parchment)',
+              border: '1px solid var(--color-gold-deep)',
+            },
+          }}
+        />
+      </body>
     </html>
   );
 }

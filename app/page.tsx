@@ -3,7 +3,7 @@ import Link from 'next/link';
 export default function Home() {
   return (
     <main
-      className="relative flex min-h-[100dvh] flex-col items-center justify-between px-6 py-10 overflow-hidden"
+      className="relative flex min-h-[100dvh] flex-col items-center justify-between px-6 py-10"
       style={{
         background:
           'radial-gradient(ellipse at 50% 30%, #5a1616 0%, #3d0e13 55%, #2a080c 100%)',
@@ -62,11 +62,13 @@ export default function Home() {
           <span className="text-lg">⚜</span>
         </div>
 
-        {/* Titre principal — script calligraphique matching le dos de carte */}
+        {/* Titre principal — script calligraphique matching le dos de carte.
+            leading >= 1.35 et padding vertical pour ne pas couper les fioritures de Great Vibes. */}
         <h1
-          className="font-[family-name:var(--font-script)] font-normal text-center leading-[1.05] mt-3"
+          className="font-[family-name:var(--font-script)] font-normal text-center mt-4 py-2"
           style={{
             fontSize: 'clamp(3.5rem, 17.5vw, 6.4rem)',
+            lineHeight: 1.35,
             letterSpacing: '0.01em',
             background:
               'linear-gradient(180deg, #f5e6c8 0%, #e6c88a 40%, #c9a96e 70%, #9c7d48 100%)',
@@ -75,15 +77,16 @@ export default function Home() {
             backgroundClip: 'text',
             filter:
               'drop-shadow(0 3px 2px rgba(0,0,0,0.5)) drop-shadow(0 0 24px rgba(230,200,138,0.25))',
-            transform: 'rotate(-3deg)',
+            transform: 'rotate(-2deg)',
           }}
         >
           Saad
         </h1>
         <h1
-          className="font-[family-name:var(--font-script)] font-normal text-center leading-[1.05] mt-2"
+          className="font-[family-name:var(--font-script)] font-normal text-center py-2"
           style={{
             fontSize: 'clamp(3.5rem, 17.5vw, 6.4rem)',
+            lineHeight: 1.35,
             letterSpacing: '0.01em',
             background:
               'linear-gradient(180deg, #f5e6c8 0%, #e6c88a 40%, #c9a96e 70%, #9c7d48 100%)',
@@ -92,7 +95,7 @@ export default function Home() {
             backgroundClip: 'text',
             filter:
               'drop-shadow(0 3px 2px rgba(0,0,0,0.5)) drop-shadow(0 0 24px rgba(230,200,138,0.25))',
-            transform: 'rotate(-3deg)',
+            transform: 'rotate(-2deg)',
           }}
         >
           Letter

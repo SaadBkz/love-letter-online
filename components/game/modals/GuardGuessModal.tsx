@@ -1,8 +1,9 @@
 'use client';
 
-import { CARD_NAME_FR, CARD_VALUE, type CardKind } from '@/lib/game';
+import { type CardKind } from '@/lib/game';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/game/Card';
 
 const GUESSABLE: CardKind[] = [
   'Spy',
@@ -26,20 +27,20 @@ export interface GuardGuessModalProps {
 export function GuardGuessModal({ open, targetName, onPick, onCancel }: GuardGuessModalProps) {
   return (
     <Modal open={open} onClose={onCancel} title={`Garde : quelle carte a ${targetName} ?`}>
-      <p className="text-sm italic mb-4 opacity-80">
-        Déclare haut et fort ce que tu crois avoir deviné. Pas d&apos;aide, que du flair.
+      <p className="text-sm italic mb-3 opacity-80">
+        Déclare haut et fort ce que tu crois avoir deviné.
       </p>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2 justify-items-center">
         {GUESSABLE.map((kind) => (
-          <Button
+          <button
             key={kind}
-            variant="secondary"
+            type="button"
             onClick={() => onPick(kind)}
-            className="!px-2 !py-2 flex flex-col items-center h-auto min-h-[64px]"
+            className="transition-transform hover:-translate-y-1 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-gold)] rounded"
+            aria-label={`Deviner ${kind}`}
           >
-            <span className="font-display text-lg">{CARD_VALUE[kind]}</span>
-            <span className="text-[10px] leading-tight">{CARD_NAME_FR[kind]}</span>
-          </Button>
+            <Card kind={kind} size="sm" />
+          </button>
         ))}
       </div>
       <Button variant="ghost" onClick={onCancel} className="w-full mt-4">

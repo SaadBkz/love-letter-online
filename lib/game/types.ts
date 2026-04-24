@@ -52,6 +52,20 @@ export const CARD_NAME_FR: Record<CardKind, string> = {
   Princess: 'Princesse',
 };
 
+/** Article défini FR adapté au genre (et à la voyelle initiale). Ex: "l'Espionne", "le Baron", "la Princesse". */
+export const CARD_ARTICLE_FR: Record<CardKind, string> = {
+  Spy: "l'",
+  Guard: 'le ',
+  Priest: 'le ',
+  Baron: 'le ',
+  Handmaid: 'la ',
+  Prince: 'le ',
+  Chancellor: 'la ',
+  King: 'le ',
+  Countess: 'la ',
+  Princess: 'la ',
+};
+
 /** Cartes qui doivent cibler un adversaire (ou soi-même pour Prince). */
 export const CARD_REQUIRES_TARGET: Record<CardKind, boolean> = {
   Spy: false,

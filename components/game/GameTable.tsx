@@ -216,35 +216,40 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
 
   return (
     <div className="relative flex flex-col h-[100dvh] w-full max-w-md mx-auto overflow-hidden">
-      {/* Header */}
-      <header className="flex items-center justify-between px-3 py-2 border-b border-[color:var(--color-gold-deep)]/30 shrink-0">
-        <div className="text-xs font-display opacity-80 flex items-center gap-2">
-          <span>Manche {state.roundNumber}</span>
+      {/* Header compact */}
+      <header className="flex items-center justify-between px-2 py-1 border-b border-[color:var(--color-gold-deep)]/30 shrink-0 text-xs">
+        <div className="font-display opacity-80 flex items-center gap-2">
+          <span>M{state.roundNumber}·T{state.turnNumber}</span>
           <span className="opacity-50">·</span>
-          <span>Tour {state.turnNumber}</span>
+          <span style={{ color: 'var(--color-gold-bright)' }}>{human.name}</span>
+          <span className="flex items-center gap-0.5">
+            {Array.from({ length: human.tokens }).map((_, i) => (
+              <WaxSealToken key={i} size="xs" />
+            ))}
+          </span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5">
           <button
             onClick={() => setLogOpen(true)}
-            className="p-2 rounded hover:bg-white/10"
+            className="p-1.5 rounded hover:bg-white/10"
             aria-label="Historique"
           >
-            <ScrollText className="w-5 h-5" style={{ color: 'var(--color-parchment)' }} />
+            <ScrollText className="w-4 h-4" style={{ color: 'var(--color-parchment)' }} />
           </button>
           <a
             href="/docs/rules.md"
             target="_blank"
             rel="noopener noreferrer"
-            className="p-2 rounded hover:bg-white/10"
+            className="p-1.5 rounded hover:bg-white/10"
             aria-label="Règles"
           >
-            <HelpCircle className="w-5 h-5" style={{ color: 'var(--color-parchment)' }} />
+            <HelpCircle className="w-4 h-4" style={{ color: 'var(--color-parchment)' }} />
           </a>
         </div>
       </header>
 
-      {/* Zone adversaires */}
-      <section className="flex flex-col gap-2 px-3 py-2 shrink-0">
+      {/* Zone adversaires — compact */}
+      <section className="flex flex-col gap-1 px-2 py-1 shrink-0">
         {opponents.map((p, i) => {
           const accent = ACCENT_COLORS[(i + 1) % ACCENT_COLORS.length]!;
           const isCurrent = current.id === p.id;
@@ -259,8 +264,8 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
         })}
       </section>
 
-      {/* Zone centrale */}
-      <section className="flex-1 flex flex-col items-center justify-center py-2 min-h-0 gap-2">
+      {/* Zone centrale : pioche + état */}
+      <section className="flex-1 flex flex-col items-center justify-center min-h-0 gap-1 py-1">
         <Deck
           remaining={state.deck.length}
           tappable={isHumanTurn && !hasDrawn}
@@ -268,48 +273,30 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
           onTap={handleDeckTap}
         />
         {isBotTurn && <BotThinking name={current.name} />}
+        {isHumanTurn && (
+          <div
+            className="text-center font-display text-[11px] px-2"
+            style={{ color: 'var(--color-gold-bright)' }}
+          >
+            {hasDrawn ? 'À toi — choisis une carte' : 'Tape la pioche ↑'}
+          </div>
+        )}
       </section>
 
-      {/* Indicateur de tour */}
-      {isHumanTurn && (
-        <div
-          className="text-center py-1 font-display text-sm"
-          style={{ color: 'var(--color-gold-bright)' }}
-        >
-          {hasDrawn ? 'À toi de jouer — choisis une carte' : 'Pioche d\'abord dans la pile ↑'}
-        </div>
-      )}
-
-      {/* Zone locale */}
+      {/* Zone locale — compact */}
       <section
         className={cn(
-          'shrink-0 pt-2 pb-3 px-2 border-t transition-colors',
+          'shrink-0 pt-1 pb-2 px-1 border-t transition-colors',
           isHumanTurn
             ? 'border-[color:var(--color-gold-bright)]'
             : 'border-[color:var(--color-gold-deep)]/30',
         )}
         style={
           isHumanTurn
-            ? { boxShadow: '0 -6px 20px rgba(201,169,110,0.25)' }
+            ? { boxShadow: '0 -4px 16px rgba(201,169,110,0.22)' }
             : undefined
         }
       >
-        <div className="flex items-center justify-between mb-1 px-1">
-          <div
-            className="text-xs font-display flex items-center gap-1.5"
-            style={{ color: 'var(--color-gold-bright)' }}
-          >
-            {human.name}
-          </div>
-          <div className="text-xs font-mono opacity-80 flex items-center gap-1">
-            {Array.from({ length: human.tokens }).map((_, i) => (
-              <WaxSealToken key={i} size="xs" />
-            ))}
-            <span className="ml-1">
-              {human.tokens}
-            </span>
-          </div>
-        </div>
         <LocalHand
           hand={human.hand}
           visibleCount={visibleHandCount}
@@ -319,9 +306,9 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
           readOnly={!isHumanTurn || !hasDrawn}
         />
         {human.discard.length > 0 && (
-          <div className="mt-1 flex items-center gap-2 px-1">
-            <span className="text-[10px] opacity-60 font-display uppercase tracking-wider shrink-0">
-              Ma défausse
+          <div className="mt-1 flex items-center gap-1 px-1">
+            <span className="text-[9px] opacity-60 font-display uppercase tracking-wider shrink-0">
+              Défausse
             </span>
             <div className="flex gap-[2px] overflow-x-auto">
               {human.discard.map((c, i) => (
@@ -376,7 +363,7 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
 function MiniOwnDiscard({ kind }: { kind: CardKind }) {
   return (
     <div
-      className="w-[26px] h-[36px] rounded flex flex-col items-center justify-center font-display font-bold"
+      className="w-[22px] h-[30px] rounded-sm flex items-center justify-center font-display font-bold"
       style={{
         background:
           'linear-gradient(180deg, var(--color-parchment) 0%, var(--color-parchment-dark) 100%)',
@@ -386,9 +373,6 @@ function MiniOwnDiscard({ kind }: { kind: CardKind }) {
       title={CARD_NAME_FR[kind]}
     >
       <span style={{ fontSize: 11, lineHeight: 1 }}>{CARD_VALUE[kind]}</span>
-      <span style={{ fontSize: 7, opacity: 0.7, lineHeight: 1 }}>
-        {CARD_NAME_FR[kind].slice(0, 3)}
-      </span>
     </div>
   );
 }

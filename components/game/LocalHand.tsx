@@ -28,7 +28,7 @@ export function LocalHand({
   const shown = visibleCount !== undefined ? hand.slice(0, visibleCount) : hand;
 
   return (
-    <div className={cn('flex items-end gap-3 justify-center pb-2 min-h-[260px]')}>
+    <div className={cn('flex items-end gap-3 justify-center min-h-[180px]')}>
       <AnimatePresence>
         {shown.map((c, i) => {
           const isPlayable = !readOnly && (playable ? playable.includes(c) : true);

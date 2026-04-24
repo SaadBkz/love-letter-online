@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'motion/react';
-import { CARD_NAME_FR, type CardKind, type Player, type RevealEvent } from '@/lib/game';
+import { CARD_ARTICLE_FR, CARD_NAME_FR, type CardKind, type Player, type RevealEvent } from '@/lib/game';
 import { Card } from './Card';
 
 export interface RevealBubbleProps {
@@ -136,6 +136,9 @@ function GuardBubble({
   guess: CardKind;
   correct: boolean;
 }) {
+  const article = CARD_ARTICLE_FR[guess];
+  const articleCapitalized =
+    article === "l'" ? "L'" : article.charAt(0).toUpperCase() + article.slice(1);
   return (
     <div className="flex flex-col items-center gap-3">
       <SpeechBubble>
@@ -147,20 +150,31 @@ function GuardBubble({
           <span
             className="font-display font-bold leading-tight uppercase mt-2"
             style={{
-              fontSize: '1.5rem',
+              fontSize: '1.3rem',
               letterSpacing: '0.04em',
               color: 'var(--color-cartouche-deep)',
               textShadow: '0 1px 0 rgba(255,255,255,0.3)',
             }}
           >
-            « Tu as la {CARD_NAME_FR[guess]} ! »
+            « Tu as {article}
+            {CARD_NAME_FR[guess]} ! »
           </span>
         </div>
       </SpeechBubble>
+
+      {/* Illustration de la carte devinée */}
+      <motion.div
+        initial={{ scale: 0, rotate: -8, opacity: 0 }}
+        animate={{ scale: 1, rotate: 0, opacity: 1 }}
+        transition={{ delay: 0.25, type: 'spring', stiffness: 220, damping: 18 }}
+      >
+        <Card kind={guess} size="md" />
+      </motion.div>
+
       <motion.div
         initial={{ scale: 0, rotate: -20, opacity: 0 }}
         animate={{ scale: 1, rotate: correct ? -8 : 6, opacity: 1 }}
-        transition={{ delay: 0.6, type: 'spring', stiffness: 500, damping: 14 }}
+        transition={{ delay: 0.65, type: 'spring', stiffness: 500, damping: 14 }}
         className="px-6 py-2 rounded font-display font-bold uppercase tracking-wider"
         style={{
           background: correct ? '#a62424' : '#6b8e4e',
@@ -173,6 +187,8 @@ function GuardBubble({
       >
         {correct ? 'Touché !' : 'Raté.'}
       </motion.div>
+      {/* articleCapitalized est gardé pour usage futur éventuel */}
+      <span className="sr-only">{articleCapitalized}</span>
     </div>
   );
 }

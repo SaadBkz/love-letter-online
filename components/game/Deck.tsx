@@ -6,16 +6,14 @@ import { Card } from './Card';
 
 export interface DeckProps {
   remaining: number;
-  /** Indique si la pioche est activable (tour du joueur local, carte pas encore piochée) */
   tappable?: boolean;
-  /** Affiche la carte piochée (face visible) en overlay le temps de l'animation */
   revealingCard?: import('@/lib/game').CardKind | null;
   onTap?: () => void;
 }
 
 export function Deck({ remaining, tappable, revealingCard, onTap }: DeckProps) {
   return (
-    <div className="relative flex flex-col items-center gap-2">
+    <div className="relative flex flex-col items-center gap-1">
       <motion.button
         type="button"
         onClick={tappable ? onTap : undefined}
@@ -27,7 +25,7 @@ export function Deck({ remaining, tappable, revealingCard, onTap }: DeckProps) {
                 scale: [1, 1.04, 1],
                 filter: [
                   'drop-shadow(0 0 0px rgba(230,200,138,0))',
-                  'drop-shadow(0 0 10px rgba(230,200,138,0.65))',
+                  'drop-shadow(0 0 8px rgba(230,200,138,0.65))',
                   'drop-shadow(0 0 0px rgba(230,200,138,0))',
                 ],
               }
@@ -42,20 +40,19 @@ export function Deck({ remaining, tappable, revealingCard, onTap }: DeckProps) {
       >
         {remaining > 0 ? (
           <>
-            <CardBack size="md" className="absolute -top-1.5 -left-1.5 opacity-50" />
-            <CardBack size="md" className="absolute -top-1 -left-1 opacity-70" />
-            <CardBack size="md" className="absolute -top-0.5 -left-0.5 opacity-85" />
-            <CardBack size="md" className="relative" />
+            <CardBack size="sm" className="absolute -top-1 -left-1 opacity-55" />
+            <CardBack size="sm" className="absolute -top-0.5 -left-0.5 opacity-80" />
+            <CardBack size="sm" className="relative" />
           </>
         ) : (
           <div
-            className="w-[104px] h-[146px] rounded-[8px] flex items-center justify-center text-center text-[10px] italic opacity-50"
+            className="w-[60px] h-[84px] rounded-[8px] flex items-center justify-center text-center text-[9px] italic opacity-50"
             style={{
               border: '1px dashed var(--color-gold-deep)',
               color: 'var(--color-parchment)',
             }}
           >
-            pioche vide
+            vide
           </div>
         )}
 
@@ -64,8 +61,6 @@ export function Deck({ remaining, tappable, revealingCard, onTap }: DeckProps) {
           <motion.div
             className="absolute inset-0 flex items-center justify-center"
             style={{ perspective: 800 }}
-            initial={{ opacity: 1 }}
-            animate={{ opacity: 1 }}
           >
             <motion.div
               initial={{ rotateY: 180 }}
@@ -73,26 +68,26 @@ export function Deck({ remaining, tappable, revealingCard, onTap }: DeckProps) {
               transition={{ duration: 0.55, ease: 'easeOut' }}
               style={{ transformStyle: 'preserve-3d' }}
             >
-              <Card kind={revealingCard} size="md" />
+              <Card kind={revealingCard} size="sm" />
             </motion.div>
           </motion.div>
         )}
       </motion.button>
 
       <div
-        className="font-mono text-[11px] px-2 py-0.5 rounded"
+        className="font-mono text-[10px] px-1.5 py-0 rounded"
         style={{
           background: 'rgba(0,0,0,0.55)',
           color: 'var(--color-gold-bright)',
           border: '1px solid var(--color-gold-deep)',
         }}
       >
-        {remaining} {remaining <= 1 ? 'carte' : 'cartes'}
+        {remaining}
       </div>
 
       {tappable && (
         <motion.div
-          className="text-[10px] font-display uppercase tracking-widest"
+          className="text-[9px] font-display uppercase tracking-widest"
           animate={{ opacity: [0.5, 1, 0.5] }}
           transition={{ duration: 1.2, repeat: Infinity }}
           style={{ color: 'var(--color-gold-bright)' }}

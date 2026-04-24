@@ -3,7 +3,6 @@
 import { motion, AnimatePresence } from 'motion/react';
 import type { CardKind, Player } from '@/lib/game';
 import { CARD_NAME_FR, CARD_VALUE } from '@/lib/game';
-import { CardBack } from './CardBack';
 import { HandmaidShield } from './HandmaidShield';
 import { WaxSealToken } from './WaxSealToken';
 import { cn } from '@/lib/utils/cn';
@@ -27,7 +26,7 @@ export function PlayerSeat({
   return (
     <motion.div
       className={cn(
-        'relative flex gap-2 items-center p-2 rounded-lg transition-colors',
+        'relative flex gap-1.5 items-center px-1.5 py-1 rounded-md transition-colors',
         player.isEliminated && 'grayscale',
         className,
       )}
@@ -44,12 +43,12 @@ export function PlayerSeat({
       {/* Glow actif */}
       {isCurrent && !player.isEliminated && (
         <motion.div
-          className="absolute -inset-0.5 rounded-lg pointer-events-none"
+          className="absolute -inset-0.5 rounded-md pointer-events-none"
           animate={{
             boxShadow: [
-              `0 0 12px 0px ${accent}aa`,
-              `0 0 24px 4px ${accent}cc`,
-              `0 0 12px 0px ${accent}aa`,
+              `0 0 10px 0px ${accent}aa`,
+              `0 0 18px 3px ${accent}cc`,
+              `0 0 10px 0px ${accent}aa`,
             ],
           }}
           transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
@@ -59,22 +58,21 @@ export function PlayerSeat({
       {/* Handmaid shield */}
       {player.isProtected && !player.isEliminated && <HandmaidShield />}
 
-      {/* Avatar + nom + jetons */}
-      <div className="flex items-center gap-2 min-w-0 z-10">
+      {/* Avatar + nom + jetons — compact */}
+      <div className="flex items-center gap-1.5 min-w-0 z-10 shrink-0">
         <div
-          className="w-9 h-9 rounded-full flex items-center justify-center font-display font-bold text-sm shrink-0"
+          className="w-7 h-7 rounded-full flex items-center justify-center font-display font-bold text-xs shrink-0"
           style={{
             background: accent,
             color: 'var(--color-ink)',
             border: '1px solid var(--color-gold-deep)',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.3)',
           }}
         >
           {player.name[0]?.toUpperCase() ?? '?'}
         </div>
-        <div className="flex flex-col min-w-0">
+        <div className="flex flex-col min-w-0 leading-tight">
           <div
-            className="font-display text-sm leading-tight truncate max-w-[110px]"
+            className="font-display text-[12px] truncate max-w-[80px]"
             style={{ color: 'var(--color-parchment)' }}
           >
             {player.name}
@@ -87,15 +85,12 @@ export function PlayerSeat({
                 pop={recentlyWon && i === player.tokens - 1}
               />
             ))}
-            {player.tokens === 0 && (
-              <span className="text-[9px] opacity-50 font-mono">0 jeton</span>
-            )}
           </div>
         </div>
       </div>
 
       {/* Main (dos) */}
-      <div className="flex gap-1 z-10">
+      <div className="flex gap-0.5 z-10 shrink-0">
         <AnimatePresence>
           {player.hand.map((_, i) => (
             <motion.div
@@ -105,38 +100,56 @@ export function PlayerSeat({
               exit={{ scale: 0.4, opacity: 0, y: -20 }}
               transition={{ type: 'spring', stiffness: 260, damping: 20 }}
             >
-              <CardBack size="sm" />
+              <MiniCardBack />
             </motion.div>
           ))}
         </AnimatePresence>
         {player.isEliminated && (
           <span
-            className="text-[10px] font-display uppercase tracking-wider pl-2 self-center"
+            className="text-[9px] font-display uppercase tracking-wider pl-1 self-center"
             style={{ color: 'var(--color-danger)' }}
           >
-            ✕ éliminé·e
+            ✕
           </span>
         )}
       </div>
 
-      {/* Défausse */}
+      {/* Défausse — occupe le reste avec overflow scroll horizontal */}
       {player.discard.length > 0 && (
-        <DiscardFan cards={player.discard} />
+        <div className="flex-1 min-w-0 overflow-x-auto z-10">
+          <DiscardFan cards={player.discard} />
+        </div>
       )}
     </motion.div>
   );
 }
 
+function MiniCardBack() {
+  // Version ultra-compacte du dos pour les seats adversaires
+  return (
+    <div
+      className="w-[30px] h-[42px] rounded-sm border"
+      style={{
+        borderColor: 'var(--color-gold-deep)',
+        background:
+          'radial-gradient(ellipse at center, #5a1616 0%, #3d0e13 60%, #2a080c 100%)',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.6)',
+      }}
+      aria-hidden
+    />
+  );
+}
+
 function DiscardFan({ cards }: { cards: CardKind[] }) {
   return (
-    <div className="flex gap-[2px] flex-wrap max-w-[180px] z-10">
+    <div className="flex gap-[2px]">
       <AnimatePresence>
         {cards.map((c, i) => (
           <motion.div
             key={`${c}-${i}`}
             initial={{ scale: 0.4, rotate: -30, opacity: 0 }}
             animate={{ scale: 1, rotate: 0, opacity: 0.95 }}
-            transition={{ type: 'spring', stiffness: 280, damping: 22, delay: 0.05 }}
+            transition={{ type: 'spring', stiffness: 280, damping: 22 }}
             title={CARD_NAME_FR[c]}
           >
             <MiniDiscardCard kind={c} />
@@ -150,7 +163,7 @@ function DiscardFan({ cards }: { cards: CardKind[] }) {
 function MiniDiscardCard({ kind }: { kind: CardKind }) {
   return (
     <div
-      className="w-[26px] h-[36px] rounded flex flex-col items-center justify-center font-display font-bold text-[11px] shrink-0"
+      className="w-[22px] h-[30px] rounded-sm flex items-center justify-center font-display font-bold shrink-0"
       style={{
         background:
           'linear-gradient(180deg, var(--color-parchment) 0%, var(--color-parchment-dark) 100%)',
@@ -158,11 +171,9 @@ function MiniDiscardCard({ kind }: { kind: CardKind }) {
         border: '1px solid var(--color-gold-deep)',
       }}
       aria-label={CARD_NAME_FR[kind]}
+      title={CARD_NAME_FR[kind]}
     >
       <span style={{ fontSize: 11, lineHeight: 1 }}>{CARD_VALUE[kind]}</span>
-      <span style={{ fontSize: 7, opacity: 0.7, lineHeight: 1 }}>
-        {CARD_NAME_FR[kind].slice(0, 3)}
-      </span>
     </div>
   );
 }

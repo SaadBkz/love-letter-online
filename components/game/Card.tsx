@@ -89,7 +89,7 @@ export function Card({
 
   const dimStyle = responsive
     ? {
-        width: 'clamp(150px, calc((100vw - 60px) / 2), 220px)',
+        width: 'clamp(118px, calc((100vw - 64px) / 2), 170px)',
         aspectRatio: '0.714',
         height: 'auto' as const,
       }

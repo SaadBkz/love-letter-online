@@ -1,5 +1,5 @@
 import type { CardKind, GameState, PlayerId } from './types';
-import { CARD_VALUE } from './types';
+import { CARD_ARTICLE_FR, CARD_NAME_FR, CARD_VALUE } from './types';
 import { playerById, pushLog, updatePlayer } from './utils';
 
 export interface EffectContext {
@@ -59,9 +59,11 @@ function applyGuard(state: GameState, ctx: EffectContext): GameState {
   const target = playerById(state, ctx.target);
   const targetCard = target.hand[0];
   const correct = targetCard === ctx.guardGuess;
+  const article = CARD_ARTICLE_FR[ctx.guardGuess];
+  const nameFr = CARD_NAME_FR[ctx.guardGuess];
   let next = pushLog(state, {
     actorId: ctx.actorId,
-    text: `${actor.name} devine ${ctx.guardGuess} chez ${target.name} : ${correct ? 'touché' : 'raté'}.`,
+    text: `${actor.name} devine ${article}${nameFr} chez ${target.name} : ${correct ? 'touché' : 'raté'}.`,
     kind: correct ? 'elim' : 'info',
     reveal: {
       type: 'guardGuess',

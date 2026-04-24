@@ -64,32 +64,34 @@ export default function Home() {
 
         {/* Titre principal — script calligraphique matching le dos de carte */}
         <h1
-          className="font-[family-name:var(--font-script)] font-normal text-center leading-[0.9] mt-4"
+          className="font-[family-name:var(--font-script)] font-normal text-center leading-[1.05] mt-3"
           style={{
-            fontSize: 'clamp(5.5rem, 28vw, 10rem)',
+            fontSize: 'clamp(4.4rem, 22vw, 8rem)',
             letterSpacing: '0.01em',
             background:
               'linear-gradient(180deg, #f5e6c8 0%, #e6c88a 40%, #c9a96e 70%, #9c7d48 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
-            filter: 'drop-shadow(0 3px 2px rgba(0,0,0,0.5)) drop-shadow(0 0 24px rgba(230,200,138,0.25))',
+            filter:
+              'drop-shadow(0 3px 2px rgba(0,0,0,0.5)) drop-shadow(0 0 24px rgba(230,200,138,0.25))',
             transform: 'rotate(-3deg)',
           }}
         >
           Saad
         </h1>
         <h1
-          className="font-[family-name:var(--font-script)] font-normal text-center leading-[0.9] -mt-8"
+          className="font-[family-name:var(--font-script)] font-normal text-center leading-[1.05] mt-2"
           style={{
-            fontSize: 'clamp(5.5rem, 28vw, 10rem)',
+            fontSize: 'clamp(4.4rem, 22vw, 8rem)',
             letterSpacing: '0.01em',
             background:
               'linear-gradient(180deg, #f5e6c8 0%, #e6c88a 40%, #c9a96e 70%, #9c7d48 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
-            filter: 'drop-shadow(0 3px 2px rgba(0,0,0,0.5)) drop-shadow(0 0 24px rgba(230,200,138,0.25))',
+            filter:
+              'drop-shadow(0 3px 2px rgba(0,0,0,0.5)) drop-shadow(0 0 24px rgba(230,200,138,0.25))',
             transform: 'rotate(-3deg)',
           }}
         >

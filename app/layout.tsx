@@ -30,6 +30,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'Saad Letter',
   description: 'Jeu de cartes inspiré de Love Letter, en ligne, multijoueur temps réel.',
+  manifest: '/manifest.webmanifest',
 };
 
 export const viewport: Viewport = {

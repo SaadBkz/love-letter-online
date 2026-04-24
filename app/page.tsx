@@ -66,7 +66,7 @@ export default function Home() {
         <h1
           className="font-[family-name:var(--font-script)] font-normal text-center leading-[1.05] mt-3"
           style={{
-            fontSize: 'clamp(4.4rem, 22vw, 8rem)',
+            fontSize: 'clamp(3.5rem, 17.5vw, 6.4rem)',
             letterSpacing: '0.01em',
             background:
               'linear-gradient(180deg, #f5e6c8 0%, #e6c88a 40%, #c9a96e 70%, #9c7d48 100%)',
@@ -83,7 +83,7 @@ export default function Home() {
         <h1
           className="font-[family-name:var(--font-script)] font-normal text-center leading-[1.05] mt-2"
           style={{
-            fontSize: 'clamp(4.4rem, 22vw, 8rem)',
+            fontSize: 'clamp(3.5rem, 17.5vw, 6.4rem)',
             letterSpacing: '0.01em',
             background:
               'linear-gradient(180deg, #f5e6c8 0%, #e6c88a 40%, #c9a96e 70%, #9c7d48 100%)',

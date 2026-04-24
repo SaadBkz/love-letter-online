@@ -1,8 +1,12 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { CARD_NAME_FR, CARD_VALUE, type CardKind } from '@/lib/game';
 import { CARD_VISUALS } from '@/lib/utils/card-visuals';
 import { cn } from '@/lib/utils/cn';
+import { CornerOrnaments, ParchmentTexture } from './card-parts/CornerOrnaments';
+import { HeraldicCartouche } from './card-parts/HeraldicCartouche';
+import { TitleRibbon } from './card-parts/TitleRibbon';
 
 export interface CardProps {
   kind: CardKind;
@@ -11,15 +15,57 @@ export interface CardProps {
   disabled?: boolean;
   onClick?: () => void;
   className?: string;
-  /** Met en avant la carte (ex : Comtesse forcée) */
   highlight?: boolean;
+  responsive?: boolean;
 }
 
-const SIZE_CLASSES: Record<NonNullable<CardProps['size']>, string> = {
-  sm: 'w-[56px] h-[78px] text-[9px]',
-  md: 'w-[96px] h-[134px] text-[11px]',
-  lg: 'w-[160px] h-[224px] text-[13px]',
+const SIZE_CLASSES: Record<NonNullable<CardProps['size']>, { w: number; h: number }> = {
+  sm: { w: 60, h: 84 },
+  md: { w: 104, h: 146 },
+  lg: { w: 184, h: 258 },
 };
+
+const IMAGE_PATHS: Record<CardKind, string> = {
+  Spy: '/cards/spy.png',
+  Guard: '/cards/guard.png',
+  Priest: '/cards/priest.png',
+  Baron: '/cards/baron.png',
+  Handmaid: '/cards/handmaid.png',
+  Prince: '/cards/prince.png',
+  Chancellor: '/cards/chancellor.png',
+  King: '/cards/king.png',
+  Countess: '/cards/countess.png',
+  Princess: '/cards/princess.png',
+};
+
+// Cache module-level pour éviter de re-probe chaque montage
+const imageStatusCache = new Map<CardKind, 'pending' | 'loaded' | 'missing'>();
+
+function useCardImage(kind: CardKind) {
+  const [status, setStatus] = useState<'pending' | 'loaded' | 'missing'>(
+    () => imageStatusCache.get(kind) ?? 'pending',
+  );
+  useEffect(() => {
+    if (status !== 'pending') return;
+    const img = new Image();
+    let alive = true;
+    img.onload = () => {
+      if (!alive) return;
+      imageStatusCache.set(kind, 'loaded');
+      setStatus('loaded');
+    };
+    img.onerror = () => {
+      if (!alive) return;
+      imageStatusCache.set(kind, 'missing');
+      setStatus('missing');
+    };
+    img.src = IMAGE_PATHS[kind];
+    return () => {
+      alive = false;
+    };
+  }, [kind, status]);
+  return status;
+}
 
 export function Card({
   kind,
@@ -29,93 +75,152 @@ export function Card({
   onClick,
   className,
   highlight,
+  responsive,
 }: CardProps) {
   const visual = CARD_VISUALS[kind];
-  const Icon = visual.icon;
   const value = CARD_VALUE[kind];
   const name = CARD_NAME_FR[kind];
+  const { w, h } = SIZE_CLASSES[size];
+  const Icon = visual.icon;
+  const imageStatus = useCardImage(kind);
 
   const isInteractive = !!onClick && !disabled;
+  const isMd = size === 'md';
 
+  const dimStyle = responsive
+    ? {
+        width: 'clamp(150px, calc((100vw - 60px) / 2), 220px)',
+        aspectRatio: '0.714',
+        height: 'auto' as const,
+      }
+    : { width: w, height: h };
+
+  const baseButtonClasses = cn(
+    'relative overflow-hidden transition-all duration-200 select-none shrink-0',
+    'rounded-[8px] border shadow-[0_3px_10px_rgba(0,0,0,0.55)]',
+    isInteractive &&
+      'cursor-pointer hover:-translate-y-1.5 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-gold)]',
+    selected && 'ring-2 ring-[color:var(--color-gold-bright)] -translate-y-2.5',
+    highlight && 'ring-2 ring-[color:var(--color-danger)] animate-pulse',
+    disabled && 'opacity-60 grayscale',
+    className,
+  );
+
+  // Mode "full image" : l'image contient déjà tout (cadre, cartouche, banner, texte effet).
+  if (imageStatus === 'loaded') {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={`${value} — ${name}. ${visual.effect}`}
+        className={baseButtonClasses}
+        style={{
+          ...dimStyle,
+          borderColor: 'rgba(60,30,15,0.7)',
+          background: 'var(--color-parchment-dark)',
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={IMAGE_PATHS[kind]}
+          alt=""
+          aria-hidden
+          className="absolute inset-0 w-full h-full object-cover"
+          draggable={false}
+        />
+      </button>
+    );
+  }
+
+  // Mode fallback : cadre SVG + silhouette lucide
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
       aria-label={`${value} — ${name}. ${visual.effect}`}
-      className={cn(
-        'relative rounded-[10%/7%] overflow-hidden transition-transform duration-150 select-none',
-        'border border-[color:var(--color-ink)]/70 shadow-[0_2px_8px_rgba(0,0,0,0.5)]',
-        isInteractive && 'cursor-pointer hover:-translate-y-1 active:translate-y-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--color-gold)]',
-        selected && 'ring-2 ring-[color:var(--color-gold)] -translate-y-2',
-        highlight && 'ring-2 ring-[color:var(--color-danger)] animate-pulse',
-        disabled && 'opacity-50 grayscale',
-        SIZE_CLASSES[size],
-        className,
-      )}
+      className={baseButtonClasses}
       style={{
-        background:
-          'linear-gradient(180deg, var(--color-parchment) 0%, var(--color-parchment-dark) 100%)',
+        ...dimStyle,
+        borderColor: 'rgba(60,30,15,0.7)',
+        background: 'linear-gradient(165deg, #faf0dd 0%, #f5e6c8 45%, #e8d4a8 100%)',
       }}
     >
-      {/* Bordure intérieure décorative */}
+      <CornerOrnaments />
       <div
-        className="absolute inset-[4px] rounded-[inherit] pointer-events-none"
-        style={{ border: '1px solid var(--color-gold-deep)' }}
+        className="absolute pointer-events-none rounded-[4px]"
+        style={{
+          inset: size === 'sm' ? 3 : size === 'md' ? 5 : 7,
+          border: '1px solid var(--color-gold-deep)',
+          boxShadow: 'inset 0 0 0 1px rgba(230,200,138,0.4)',
+        }}
       />
+      <ParchmentTexture />
 
-      {/* Cartouche valeur (haut gauche) */}
       <div
-        className={cn(
-          'absolute top-[6%] left-[6%] rounded-full flex items-center justify-center font-display font-bold',
-          'shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]',
-        )}
+        className="absolute left-0 right-0 flex items-start justify-between"
         style={{
-          background: 'var(--color-cartouche)',
-          color: 'var(--color-gold-bright)',
-          width: '28%',
-          aspectRatio: '1',
-          fontSize: size === 'sm' ? '14px' : size === 'md' ? '22px' : '34px',
-          border: '1.5px solid var(--color-gold-deep)',
+          top: size === 'sm' ? 4 : size === 'md' ? 6 : 9,
+          paddingLeft: size === 'sm' ? 4 : size === 'md' ? 7 : 10,
+          paddingRight: size === 'sm' ? 4 : size === 'md' ? 7 : 10,
         }}
       >
-        {value}
+        <HeraldicCartouche value={value} size={size} />
+        {size !== 'sm' && (
+          <div className="flex-1 pl-1 pt-0.5 flex justify-end">
+            <TitleRibbon name={name} size={size} />
+          </div>
+        )}
       </div>
 
-      {/* Bandeau nom (haut droit) */}
       <div
-        className={cn(
-          'absolute top-[7%] right-[6%] px-[6%] py-[2%] rounded-sm font-display font-semibold',
-          'whitespace-nowrap',
-        )}
+        className="absolute left-0 right-0 flex items-center justify-center"
         style={{
-          color: 'var(--color-ink)',
-          fontSize: size === 'sm' ? '7px' : size === 'md' ? '10px' : '14px',
-          letterSpacing: '0.04em',
+          top: size === 'sm' ? '38%' : '32%',
+          bottom: size === 'sm' ? '18%' : isMd ? '36%' : '38%',
+          paddingLeft: size === 'sm' ? 6 : size === 'md' ? 10 : 14,
+          paddingRight: size === 'sm' ? 6 : size === 'md' ? 10 : 14,
         }}
       >
-        {name}
-      </div>
-
-      {/* Illustration (centre) */}
-      <div className="absolute inset-x-[10%] top-[32%] bottom-[34%] flex items-center justify-center">
         <Icon
-          className="w-full h-full"
-          style={{ color: visual.hue, opacity: 0.85 }}
-          strokeWidth={1.2}
+          style={{
+            color: visual.hue,
+            opacity: 0.85,
+            width: '55%',
+            height: '55%',
+          }}
+          strokeWidth={1.3}
         />
       </div>
 
-      {/* Effet (bas) */}
-      <div
-        className="absolute inset-x-[6%] bottom-[5%] text-center leading-tight italic"
-        style={{
-          color: 'var(--color-ink-soft)',
-          fontSize: size === 'sm' ? '6px' : size === 'md' ? '8px' : '10px',
-        }}
-      >
-        {size === 'sm' ? null : truncate(visual.effect, size === 'md' ? 80 : 160)}
-      </div>
+      {size === 'sm' && (
+        <div
+          className="absolute left-0 right-0 text-center font-display font-semibold pointer-events-none"
+          style={{
+            bottom: 3,
+            color: 'var(--color-ink)',
+            fontSize: 6.5,
+          }}
+        >
+          {name}
+        </div>
+      )}
+      {size !== 'sm' && (
+        <div
+          className="absolute left-0 right-0 text-center italic pointer-events-none"
+          style={{
+            bottom: isMd ? 5 : 9,
+            paddingLeft: isMd ? 7 : 10,
+            paddingRight: isMd ? 7 : 10,
+            color: 'var(--color-ink-soft)',
+            fontSize: isMd ? 7.5 : 9.5,
+            lineHeight: 1.25,
+          }}
+        >
+          {truncate(visual.effect, isMd ? 90 : 200)}
+        </div>
+      )}
     </button>
   );
 }

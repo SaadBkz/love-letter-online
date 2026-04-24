@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Cinzel, Geist_Mono, Lora } from 'next/font/google';
+import { Cinzel, Geist_Mono, Great_Vibes, Lora } from 'next/font/google';
 import { Toaster } from 'sonner';
 import './globals.css';
 
@@ -16,14 +16,20 @@ const lora = Lora({
   style: ['normal', 'italic'],
 });
 
+const greatVibes = Great_Vibes({
+  variable: '--font-script',
+  subsets: ['latin'],
+  weight: ['400'],
+});
+
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin'],
 });
 
 export const metadata: Metadata = {
-  title: 'Love Letter Online',
-  description: 'Jeu de cartes Love Letter en ligne, multijoueur temps réel.',
+  title: 'Saad Letter',
+  description: 'Jeu de cartes inspiré de Love Letter, en ligne, multijoueur temps réel.',
 };
 
 export const viewport: Viewport = {
@@ -41,7 +47,7 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={`${cinzel.variable} ${lora.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${cinzel.variable} ${lora.variable} ${greatVibes.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         {children}

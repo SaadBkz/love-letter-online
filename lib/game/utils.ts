@@ -50,7 +50,12 @@ export function updatePlayer(
 
 export function pushLog(
   state: GameState,
-  entry: { actorId: PlayerId | null; text: string; kind: import('./types').LogEntryKind },
+  entry: {
+    actorId: PlayerId | null;
+    text: string;
+    kind: import('./types').LogEntryKind;
+    reveal?: import('./types').RevealEvent;
+  },
 ): GameState {
   return {
     ...state,

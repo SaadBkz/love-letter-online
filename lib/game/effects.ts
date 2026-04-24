@@ -63,6 +63,13 @@ function applyGuard(state: GameState, ctx: EffectContext): GameState {
     actorId: ctx.actorId,
     text: `${actor.name} devine ${ctx.guardGuess} chez ${target.name} : ${correct ? 'touché' : 'raté'}.`,
     kind: correct ? 'elim' : 'info',
+    reveal: {
+      type: 'guardGuess',
+      actorId: ctx.actorId,
+      targetId: target.id,
+      guess: ctx.guardGuess,
+      correct,
+    },
   });
   if (correct) {
     next = eliminatePlayer(next, target.id);
@@ -80,6 +87,7 @@ function applyPriest(state: GameState, ctx: EffectContext): GameState {
     actorId: ctx.actorId,
     text: `${actor.name} regarde la main de ${target.name} : ${card}.`,
     kind: 'reveal',
+    reveal: { type: 'priestPeek', actorId: ctx.actorId, targetId: target.id, card },
   });
 }
 
@@ -92,10 +100,19 @@ function applyBaron(state: GameState, ctx: EffectContext): GameState {
   if (!a || !t) return state;
   const av = CARD_VALUE[a];
   const tv = CARD_VALUE[t];
+  const loserId = av > tv ? target.id : tv > av ? actor.id : null;
   let next = pushLog(state, {
     actorId: ctx.actorId,
     text: `${actor.name} compare sa main avec ${target.name} : ${a} vs ${t}.`,
     kind: 'reveal',
+    reveal: {
+      type: 'baronCompare',
+      actorId: ctx.actorId,
+      targetId: target.id,
+      actorCard: a,
+      targetCard: t,
+      loserId,
+    },
   });
   if (av > tv) {
     next = eliminatePlayer(next, target.id);
@@ -138,6 +155,7 @@ function applyPrince(state: GameState, ctx: EffectContext): GameState {
     actorId: ctx.actorId,
     text: `${actor.name} force ${target.name} à défausser : ${discarded}.`,
     kind: 'reveal',
+    reveal: { type: 'princeForce', actorId: ctx.actorId, targetId: target.id, card: discarded },
   });
   if (discarded === 'Princess') {
     next = eliminatePlayer(next, target.id);
@@ -218,6 +236,7 @@ function applyKing(state: GameState, ctx: EffectContext): GameState {
     actorId: ctx.actorId,
     text: `${actor.name} échange sa main avec ${target.name}.`,
     kind: 'play',
+    reveal: { type: 'kingSwap', actorId: ctx.actorId, targetId: target.id },
   });
 }
 
@@ -236,6 +255,7 @@ function applyPrincess(state: GameState, ctx: EffectContext): GameState {
     actorId: ctx.actorId,
     text: `${actor.name} défausse la Princesse et est éliminé·e.`,
     kind: 'elim',
+    reveal: { type: 'princessSuicide', actorId: ctx.actorId },
   });
   next = eliminatePlayer(next, actor.id);
   return next;

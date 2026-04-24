@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollText, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Action, CardKind, GameState, PlayerId } from '@/lib/game';
+import type { Action, CardKind, GameState, PlayerId, RevealEvent } from '@/lib/game';
 import {
   CARD_CAN_TARGET_SELF,
   CARD_NAME_FR,
   CARD_REQUIRES_TARGET,
+  CARD_VALUE,
   playableCards,
   validAnyTargets,
   validOpponentTargets,
@@ -19,15 +20,18 @@ import { TargetPickerModal } from './modals/TargetPickerModal';
 import { GuardGuessModal } from './modals/GuardGuessModal';
 import { ChancellorModal } from './modals/ChancellorModal';
 import { LogDrawer } from './modals/LogDrawer';
+import { WaxSealToken } from './WaxSealToken';
+import { BotThinking } from './BotThinking';
+import { RevealBubble } from './RevealBubble';
 import { cn } from '@/lib/utils/cn';
 
 const ACCENT_COLORS = [
-  '#c9a96e', // gold
-  '#6b8e4e', // olive
-  '#4a78a0', // steel blue
-  '#a0564a', // terracotta
-  '#8b5a9e', // violet
-  '#5a9e8b', // teal
+  '#c9a96e',
+  '#a0564a',
+  '#4a78a0',
+  '#8b5a9e',
+  '#6b8e4e',
+  '#5a9e8b',
 ];
 
 export interface GameTableProps {
@@ -36,8 +40,18 @@ export interface GameTableProps {
   onAction: (action: Action) => void;
   onStartNewRound: () => void;
   onReplay: () => void;
-  /** Nombre de logs au moment du dernier render, pour détecter les nouveaux events à toaster */
-  lastLogSize?: number;
+}
+
+/**
+ * Une révélation est "privée" au joueur humain si :
+ * - priestPeek : seul l'actor voit la carte. Donc montrer uniquement si actor === human.
+ * - Les autres events sont publics (Guard, Baron, Prince, King, Princess).
+ */
+function shouldShowReveal(ev: RevealEvent, humanId: PlayerId): boolean {
+  if (ev.type === 'priestPeek') {
+    return ev.actorId === humanId;
+  }
+  return true;
 }
 
 export function GameTable({ state, humanId, onAction }: GameTableProps) {
@@ -46,61 +60,108 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
   const current = state.players[state.currentPlayerIdx]!;
   const isHumanTurn = current.id === humanId && state.turnPhase === 'play';
   const isHumanChancellor = current.id === humanId && state.turnPhase === 'resolvingChancellor';
+  const isBotTurn = !!current?.isBot && state.turnPhase === 'play' && !current.isEliminated;
 
   const [pendingCard, setPendingCard] = useState<CardKind | null>(null);
   const [pendingTarget, setPendingTarget] = useState<PlayerId | null>(null);
   const [logOpen, setLogOpen] = useState(false);
 
-  // Toast sur nouveaux log entries (pour feedback visuel). Ref car pas besoin de re-render.
-  const shownLogCountRef = useRef(state.log.length);
+  // Manual draw : pour un tour donné (turnNumber + currentPlayerIdx), a-t-on "révélé" la carte piochée ?
+  const turnKey = `${state.roundNumber}-${state.turnNumber}-${state.currentPlayerIdx}`;
+  const [drawnTurnKey, setDrawnTurnKey] = useState<string | null>(null);
+  const [revealingCard, setRevealingCard] = useState<CardKind | null>(null);
+  const hasDrawn = drawnTurnKey === turnKey;
+
+  // Auto-draw pour les bots : quand c'est au tour d'un bot, on simule la pioche après un délai.
   useEffect(() => {
-    if (state.log.length <= shownLogCountRef.current) return;
-    const newEntries = state.log.slice(shownLogCountRef.current);
-    for (const e of newEntries) {
-      if (e.kind === 'info' || e.kind === 'play') continue;
-      if (e.kind === 'reveal' && e.actorId !== humanId) continue;
-      toast(e.text, {
-        duration: e.kind === 'reveal' ? 6000 : 3500,
-      });
+    if (state.gamePhase !== 'playing' || state.lastRoundSummary) return;
+    if (state.turnPhase !== 'play') return;
+    if (!current.isBot || current.isEliminated) return;
+    if (drawnTurnKey === turnKey) return;
+    const t = setTimeout(() => {
+      setDrawnTurnKey(turnKey);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [turnKey, state.turnPhase, state.gamePhase, state.lastRoundSummary, current.isBot, current.isEliminated, drawnTurnKey]);
+
+  function handleDeckTap() {
+    if (!isHumanTurn || hasDrawn) return;
+    // La carte piochée est la 2ᵉ de la main dans notre état (auto-draw moteur).
+    const drawn = human.hand[1];
+    if (drawn) {
+      setRevealingCard(drawn);
+      setTimeout(() => {
+        setDrawnTurnKey(turnKey);
+        setRevealingCard(null);
+      }, 600);
+    } else {
+      setDrawnTurnKey(turnKey);
     }
-    shownLogCountRef.current = state.log.length;
+  }
+
+  // Reveal bubble queue
+  const processedLogCountRef = useRef(state.log.length);
+  const [revealQueue, setRevealQueue] = useState<RevealEvent[]>([]);
+  useEffect(() => {
+    if (state.log.length <= processedLogCountRef.current) return;
+    const newEntries = state.log.slice(processedLogCountRef.current);
+    const newReveals: RevealEvent[] = [];
+    for (const e of newEntries) {
+      if (e.reveal && shouldShowReveal(e.reveal, humanId)) {
+        newReveals.push(e.reveal);
+      }
+      // Toasts for non-reveal events (elim, win, bonus)
+      if (!e.reveal && (e.kind === 'elim' || e.kind === 'win' || e.kind === 'bonus' || e.kind === 'protect')) {
+        toast(e.text, { duration: 3000 });
+      }
+    }
+    processedLogCountRef.current = state.log.length;
+    if (newReveals.length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setRevealQueue((q) => [...q, ...newReveals]);
+    }
   }, [state.log, humanId]);
 
+  // Auto-dismiss reveal after a duration (especially Guard = more dramatic)
+  useEffect(() => {
+    if (revealQueue.length === 0) return;
+    const head = revealQueue[0]!;
+    const duration = head.type === 'guardGuess' ? 3200 : head.type === 'kingSwap' ? 1800 : 2400;
+    const t = setTimeout(() => {
+      setRevealQueue((q) => q.slice(1));
+    }, duration);
+    return () => clearTimeout(t);
+  }, [revealQueue]);
+
   const humanPlayable = useMemo(() => {
-    if (!isHumanTurn) return [];
+    if (!isHumanTurn || !hasDrawn) return [];
     return playableCards(state);
-  }, [state, isHumanTurn]);
+  }, [state, isHumanTurn, hasDrawn]);
 
   const forcedCountess = useMemo<CardKind | null>(() => {
-    if (!isHumanTurn) return null;
+    if (!isHumanTurn || !hasDrawn) return null;
     const hasCountess = human.hand.includes('Countess');
     const hasKingOrPrince = human.hand.includes('King') || human.hand.includes('Prince');
     return hasCountess && hasKingOrPrince ? 'Countess' : null;
-  }, [human.hand, isHumanTurn]);
-
-  const seenDiscardCount = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const p of state.players) {
-      for (const c of p.discard) map[c] = (map[c] ?? 0) + 1;
-    }
-    for (const c of state.publicRemoved) map[c] = (map[c] ?? 0) + 1;
-    for (const c of human.hand) map[c] = (map[c] ?? 0) + 1;
-    return map;
-  }, [state.players, state.publicRemoved, human.hand]);
+  }, [human.hand, isHumanTurn, hasDrawn]);
 
   function handleCardSelect(card: CardKind) {
-    if (!isHumanTurn) return;
+    if (!isHumanTurn || !hasDrawn) return;
     const needsTarget = CARD_REQUIRES_TARGET[card];
     if (!needsTarget) {
-      // Défausse directe (Spy, Handmaid, Chancellor, Countess, Princess)
+      if (card === 'Princess') {
+        // Confirmation suicide
+        const ok = window.confirm(
+          'Défausser la Princesse = élimination immédiate. Tu confirmes ?',
+        );
+        if (!ok) return;
+      }
       onAction({ kind: 'playCard', playerId: humanId, card });
       return;
     }
-    // Vérifier s'il y a des cibles valides
     const canSelf = CARD_CAN_TARGET_SELF[card];
-    const opponents = validOpponentTargets(state, humanId);
-    if (opponents.length === 0 && !canSelf) {
-      // aucune cible valide → défausse sans effet
+    const opps = validOpponentTargets(state, humanId);
+    if (opps.length === 0 && !canSelf) {
       onAction({ kind: 'playCard', playerId: humanId, card });
       return;
     }
@@ -111,7 +172,6 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
     if (!pendingCard) return;
     if (pendingCard === 'Guard' && targetId) {
       setPendingTarget(targetId);
-      // ne submit pas encore, attend la guess
       return;
     }
     onAction({
@@ -138,12 +198,7 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
   }
 
   function handleChancellorResolve(keep: CardKind, bottom: CardKind[]) {
-    onAction({
-      kind: 'resolveChancellor',
-      playerId: humanId,
-      keep,
-      bottom,
-    });
+    onAction({ kind: 'resolveChancellor', playerId: humanId, keep, bottom });
   }
 
   function handleCancel() {
@@ -157,14 +212,18 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
       : validOpponentTargets(state, humanId)
     : [];
 
+  const visibleHandCount = isHumanTurn && !hasDrawn ? 1 : human.hand.length;
+
   return (
     <div className="relative flex flex-col h-[100dvh] w-full max-w-md mx-auto overflow-hidden">
-      {/* Header : manche / tour / aide */}
+      {/* Header */}
       <header className="flex items-center justify-between px-3 py-2 border-b border-[color:var(--color-gold-deep)]/30 shrink-0">
-        <div className="text-xs font-display opacity-80">
-          Manche {state.roundNumber} · Tour {state.turnNumber}
+        <div className="text-xs font-display opacity-80 flex items-center gap-2">
+          <span>Manche {state.roundNumber}</span>
+          <span className="opacity-50">·</span>
+          <span>Tour {state.turnNumber}</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button
             onClick={() => setLogOpen(true)}
             className="p-2 rounded hover:bg-white/10"
@@ -187,7 +246,7 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
       {/* Zone adversaires */}
       <section className="flex flex-col gap-2 px-3 py-2 shrink-0">
         {opponents.map((p, i) => {
-          const accent = ACCENT_COLORS[i + 1] ?? '#c9a96e';
+          const accent = ACCENT_COLORS[(i + 1) % ACCENT_COLORS.length]!;
           const isCurrent = current.id === p.id;
           return (
             <PlayerSeat
@@ -195,77 +254,79 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
               player={p}
               isCurrent={isCurrent}
               accent={accent}
-              orientation="top"
             />
           );
         })}
       </section>
 
-      {/* Zone centrale : pioche */}
-      <section className="flex-1 flex items-center justify-center py-2 min-h-0">
-        <Deck remaining={state.deck.length} />
+      {/* Zone centrale */}
+      <section className="flex-1 flex flex-col items-center justify-center py-2 min-h-0 gap-2">
+        <Deck
+          remaining={state.deck.length}
+          tappable={isHumanTurn && !hasDrawn}
+          revealingCard={revealingCard}
+          onTap={handleDeckTap}
+        />
+        {isBotTurn && <BotThinking name={current.name} />}
       </section>
 
       {/* Indicateur de tour */}
       {isHumanTurn && (
         <div
-          className="text-center py-1 font-display text-sm animate-pulse"
+          className="text-center py-1 font-display text-sm"
           style={{ color: 'var(--color-gold-bright)' }}
         >
-          À toi de jouer
-        </div>
-      )}
-      {!isHumanTurn && current.isBot && (
-        <div
-          className="text-center py-1 font-display text-sm opacity-70"
-          style={{ color: 'var(--color-parchment)' }}
-        >
-          {current.name} réfléchit…
+          {hasDrawn ? 'À toi de jouer — choisis une carte' : 'Pioche d\'abord dans la pile ↑'}
         </div>
       )}
 
-      {/* Zone locale : ma main + ma défausse */}
+      {/* Zone locale */}
       <section
         className={cn(
-          'shrink-0 pt-2 pb-3 px-2 border-t',
+          'shrink-0 pt-2 pb-3 px-2 border-t transition-colors',
           isHumanTurn
-            ? 'border-[color:var(--color-gold-bright)] shadow-[0_-4px_16px_rgba(201,169,110,0.3)]'
+            ? 'border-[color:var(--color-gold-bright)]'
             : 'border-[color:var(--color-gold-deep)]/30',
         )}
+        style={
+          isHumanTurn
+            ? { boxShadow: '0 -6px 20px rgba(201,169,110,0.25)' }
+            : undefined
+        }
       >
         <div className="flex items-center justify-between mb-1 px-1">
           <div
-            className="text-xs font-display"
+            className="text-xs font-display flex items-center gap-1.5"
             style={{ color: 'var(--color-gold-bright)' }}
           >
-            {human.name} {human.isProtected ? '· protégé·e' : ''}
+            {human.name}
           </div>
-          <div className="text-xs font-mono opacity-80">
-            {human.tokens} jeton{human.tokens > 1 ? 's' : ''}
+          <div className="text-xs font-mono opacity-80 flex items-center gap-1">
+            {Array.from({ length: human.tokens }).map((_, i) => (
+              <WaxSealToken key={i} size="xs" />
+            ))}
+            <span className="ml-1">
+              {human.tokens}
+            </span>
           </div>
         </div>
         <LocalHand
           hand={human.hand}
+          visibleCount={visibleHandCount}
           playable={humanPlayable}
-          onSelect={isHumanTurn ? handleCardSelect : undefined}
+          onSelect={isHumanTurn && hasDrawn ? handleCardSelect : undefined}
           forcedCard={forcedCountess}
-          readOnly={!isHumanTurn}
+          readOnly={!isHumanTurn || !hasDrawn}
         />
         {human.discard.length > 0 && (
-          <div className="mt-2 flex items-center gap-2 px-1">
-            <span className="text-[10px] opacity-60 font-display uppercase tracking-wider">
+          <div className="mt-1 flex items-center gap-2 px-1">
+            <span className="text-[10px] opacity-60 font-display uppercase tracking-wider shrink-0">
               Ma défausse
             </span>
             <div className="flex gap-[2px] overflow-x-auto">
               {human.discard.map((c, i) => (
                 <div key={`${c}-${i}`} className="shrink-0">
-                  <button
-                    type="button"
-                    className="cursor-default"
-                    aria-label={CARD_NAME_FR[c]}
-                  >
-                    <MiniCard kind={c} />
-                  </button>
+                  <MiniOwnDiscard kind={c} />
                 </div>
               ))}
             </div>
@@ -288,7 +349,6 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
         <GuardGuessModal
           open
           targetName={state.players.find((p) => p.id === pendingTarget)?.name ?? ''}
-          seenDiscard={seenDiscardCount}
           onPick={handleGuardGuess}
           onCancel={handleCancel}
         />
@@ -300,23 +360,35 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
           onResolve={handleChancellorResolve}
         />
       )}
+
+      {/* Reveal bubble queue */}
+      <RevealBubble
+        event={revealQueue[0] ?? null}
+        players={state.players}
+        onDismiss={() => setRevealQueue((q) => q.slice(1))}
+      />
+
       <LogDrawer open={logOpen} onClose={() => setLogOpen(false)} log={state.log} />
     </div>
   );
 }
 
-function MiniCard({ kind }: { kind: CardKind }) {
-  // Petit badge compact pour la défausse locale
+function MiniOwnDiscard({ kind }: { kind: CardKind }) {
   return (
     <div
-      className="w-[28px] h-[40px] rounded flex items-center justify-center font-display font-bold text-xs"
+      className="w-[26px] h-[36px] rounded flex flex-col items-center justify-center font-display font-bold"
       style={{
-        background: 'var(--color-parchment)',
+        background:
+          'linear-gradient(180deg, var(--color-parchment) 0%, var(--color-parchment-dark) 100%)',
         color: 'var(--color-ink)',
         border: '1px solid var(--color-gold-deep)',
       }}
+      title={CARD_NAME_FR[kind]}
     >
-      {CARD_NAME_FR[kind]?.[0] ?? '?'}
+      <span style={{ fontSize: 11, lineHeight: 1 }}>{CARD_VALUE[kind]}</span>
+      <span style={{ fontSize: 7, opacity: 0.7, lineHeight: 1 }}>
+        {CARD_NAME_FR[kind].slice(0, 3)}
+      </span>
     </div>
   );
 }

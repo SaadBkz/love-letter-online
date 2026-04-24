@@ -109,12 +109,29 @@ export type TurnPhase = 'draw' | 'play' | 'resolvingChancellor';
 
 export type LogEntryKind = 'info' | 'play' | 'elim' | 'protect' | 'reveal' | 'win' | 'bonus';
 
+export type RevealEvent =
+  | { type: 'guardGuess'; actorId: PlayerId; targetId: PlayerId; guess: CardKind; correct: boolean }
+  | { type: 'priestPeek'; actorId: PlayerId; targetId: PlayerId; card: CardKind }
+  | {
+      type: 'baronCompare';
+      actorId: PlayerId;
+      targetId: PlayerId;
+      actorCard: CardKind;
+      targetCard: CardKind;
+      loserId: PlayerId | null;
+    }
+  | { type: 'princeForce'; actorId: PlayerId; targetId: PlayerId; card: CardKind }
+  | { type: 'kingSwap'; actorId: PlayerId; targetId: PlayerId }
+  | { type: 'princessSuicide'; actorId: PlayerId };
+
 export interface LogEntry {
   round: number;
   turn: number;
   actorId: PlayerId | null;
   text: string;
   kind: LogEntryKind;
+  /** Données structurées pour les overlays dramatiques (bulles BD, reveals). */
+  reveal?: RevealEvent;
 }
 
 export interface GameState {

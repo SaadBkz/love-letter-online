@@ -122,11 +122,11 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
     }
   }, [state.log, humanId]);
 
-  // Auto-dismiss reveal after a duration (especially Guard = more dramatic)
+  // Auto-dismiss reveal après une durée (Garde = 2s, autres selon type)
   useEffect(() => {
     if (revealQueue.length === 0) return;
     const head = revealQueue[0]!;
-    const duration = head.type === 'guardGuess' ? 3200 : head.type === 'kingSwap' ? 1800 : 2400;
+    const duration = head.type === 'guardGuess' ? 2000 : head.type === 'kingSwap' ? 1800 : 2400;
     const t = setTimeout(() => {
       setRevealQueue((q) => q.slice(1));
     }, duration);

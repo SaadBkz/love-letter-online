@@ -166,7 +166,7 @@ function GuardBubble({
       <motion.div
         initial={{ scale: 0, rotate: -8, opacity: 0 }}
         animate={{ scale: 1, rotate: 0, opacity: 1 }}
-        transition={{ delay: 0.25, type: 'spring', stiffness: 220, damping: 18 }}
+        transition={{ delay: 0.35, type: 'spring', stiffness: 220, damping: 18 }}
       >
         <Card kind={guess} size="md" />
       </motion.div>
@@ -174,7 +174,7 @@ function GuardBubble({
       <motion.div
         initial={{ scale: 0, rotate: -20, opacity: 0 }}
         animate={{ scale: 1, rotate: correct ? -8 : 6, opacity: 1 }}
-        transition={{ delay: 0.65, type: 'spring', stiffness: 500, damping: 14 }}
+        transition={{ delay: 1.4, type: 'spring', stiffness: 500, damping: 14 }}
         className="px-6 py-2 rounded font-display font-bold uppercase tracking-wider"
         style={{
           background: correct ? '#a62424' : '#6b8e4e',
@@ -269,9 +269,9 @@ function BaronBubble({
         </div>
       </div>
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
+        initial={{ opacity: 0, y: 10, scale: 0.7 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ delay: 1.5, type: 'spring', stiffness: 460, damping: 16 }}
         className="px-5 py-2 rounded font-display font-bold uppercase tracking-wider"
         style={{
           background: loserName ? '#a62424' : '#5c3a28',
@@ -308,7 +308,7 @@ function PrinceBubble({
       <motion.div
         initial={{ x: 0 }}
         animate={{ x: [0, -10, 10, -6, 6, 0] }}
-        transition={{ delay: 0.35, duration: 0.5 }}
+        transition={{ delay: 0.4, duration: 0.5 }}
       >
         <Card kind={card} size="lg" />
       </motion.div>
@@ -316,7 +316,7 @@ function PrinceBubble({
         <motion.div
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.9, type: 'spring', stiffness: 500, damping: 16 }}
+          transition={{ delay: 1.6, type: 'spring', stiffness: 500, damping: 16 }}
           className="px-5 py-2 rounded font-display font-bold uppercase tracking-wider"
           style={{
             background: '#a62424',
@@ -367,7 +367,7 @@ function PrincessBubble({ actor }: { actor: string }) {
       <motion.div
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
-        transition={{ delay: 0.3, type: 'spring', stiffness: 400, damping: 12 }}
+        transition={{ delay: 1.0, type: 'spring', stiffness: 400, damping: 12 }}
         className="px-6 py-2 rounded font-display font-bold uppercase tracking-wider"
         style={{
           background: '#a62424',

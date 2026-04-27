@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollText, HelpCircle } from 'lucide-react';
-import { toast } from 'sonner';
 import type { Action, CardKind, GameState, PlayerId, RevealEvent } from '@/lib/game';
 import {
   CARD_CAN_TARGET_SELF,
@@ -21,7 +20,7 @@ import { GuardGuessModal } from './modals/GuardGuessModal';
 import { ChancellorModal } from './modals/ChancellorModal';
 import { LogDrawer } from './modals/LogDrawer';
 import { WaxSealToken } from './WaxSealToken';
-import { BotThinking } from './BotThinking';
+import { GameLogFeed } from './GameLogFeed';
 import { RevealBubble } from './RevealBubble';
 import { cn } from '@/lib/utils/cn';
 
@@ -110,12 +109,9 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
       if (e.reveal && shouldShowReveal(e.reveal, humanId)) {
         newReveals.push(e.reveal);
       }
-      // Pas de toast pour 'elim' et 'win' : ils anticiperaient la conclusion
-      // (déjà dramatisée via reveal bubbles + RoundEndModal). On garde 'protect'
-      // (Servante : pas de reveal dédié) et 'bonus' (Espionne : info utile au moment).
-      if (!e.reveal && (e.kind === 'protect' || e.kind === 'bonus')) {
-        toast(e.text, { duration: 3000 });
-      }
+      // Plus aucun toast pour les events de jeu : tout passe par le feed central
+      // (GameLogFeed). Les toasts restent réservés aux erreurs (action refusée,
+      // erreur réseau) déclenchées ailleurs dans la page.
     }
     processedLogCountRef.current = state.log.length;
     if (newReveals.length > 0) {
@@ -287,26 +283,15 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
         })}
       </section>
 
-      {/* Zone centrale : pioche + état */}
-      <section className="flex-1 flex flex-col items-center justify-center min-h-0 gap-1 py-1">
-        <Deck
-          remaining={state.deck.length}
-          tappable={isHumanTurn && !hasDrawn}
-          revealingCard={revealingCard}
-          onTap={handleDeckTap}
+      {/* Zone centrale : feed de logs (auto-scroll vers la dernière entrée) */}
+      <section className="flex-1 min-h-0 px-2 py-1">
+        <GameLogFeed
+          log={state.log}
+          thinkingBotName={isBotTurn ? current.name : null}
         />
-        {isBotTurn && <BotThinking name={current.name} />}
-        {isHumanTurn && (
-          <div
-            className="text-center font-display text-[11px] px-2"
-            style={{ color: 'var(--color-gold-bright)' }}
-          >
-            {hasDrawn ? 'À toi — choisis une carte' : 'Tape la pioche ↑'}
-          </div>
-        )}
       </section>
 
-      {/* Zone locale — compact */}
+      {/* Zone locale — Pioche (gauche) + Main (centre) + Défausse mini (sous) */}
       <section
         className={cn(
           'shrink-0 pt-1 pb-2 px-1 border-t transition-colors',
@@ -320,14 +305,26 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
             : undefined
         }
       >
-        <LocalHand
-          hand={human.hand}
-          visibleCount={visibleHandCount}
-          playable={humanPlayable}
-          onSelect={isHumanTurn && hasDrawn ? handleCardSelect : undefined}
-          forcedCard={forcedCountess}
-          readOnly={!isHumanTurn || !hasDrawn}
-        />
+        <div className="flex items-center gap-2 px-1">
+          <div className="shrink-0">
+            <Deck
+              remaining={state.deck.length}
+              tappable={isHumanTurn && !hasDrawn}
+              revealingCard={revealingCard}
+              onTap={handleDeckTap}
+            />
+          </div>
+          <div className="flex-1 min-w-0 flex items-center justify-center">
+            <LocalHand
+              hand={human.hand}
+              visibleCount={visibleHandCount}
+              playable={humanPlayable}
+              onSelect={isHumanTurn && hasDrawn ? handleCardSelect : undefined}
+              forcedCard={forcedCountess}
+              readOnly={!isHumanTurn || !hasDrawn}
+            />
+          </div>
+        </div>
         {human.discard.length > 0 && (
           <div className="mt-1 flex items-center gap-1 px-1">
             <span className="text-[9px] opacity-60 font-display uppercase tracking-wider shrink-0">

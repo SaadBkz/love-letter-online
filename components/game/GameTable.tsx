@@ -110,8 +110,10 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
       if (e.reveal && shouldShowReveal(e.reveal, humanId)) {
         newReveals.push(e.reveal);
       }
-      // Toasts for non-reveal events (elim, win, bonus)
-      if (!e.reveal && (e.kind === 'elim' || e.kind === 'win' || e.kind === 'bonus' || e.kind === 'protect')) {
+      // Pas de toast pour 'elim' et 'win' : ils anticiperaient la conclusion
+      // (déjà dramatisée via reveal bubbles + RoundEndModal). On garde 'protect'
+      // (Servante : pas de reveal dédié) et 'bonus' (Espionne : info utile au moment).
+      if (!e.reveal && (e.kind === 'protect' || e.kind === 'bonus')) {
         toast(e.text, { duration: 3000 });
       }
     }
@@ -122,16 +124,37 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
     }
   }, [state.log, humanId]);
 
-  // Auto-dismiss reveal après une durée (Garde = 2s, autres selon type)
+  // Auto-dismiss reveal après une durée. Allongé pour laisser le temps de
+  // voir l'animation complète (cartes → verdict décalé d'1.0–1.6s dans
+  // RevealBubble.tsx).
   useEffect(() => {
     if (revealQueue.length === 0) return;
     const head = revealQueue[0]!;
-    const duration = head.type === 'guardGuess' ? 2000 : head.type === 'kingSwap' ? 1800 : 2400;
+    const duration =
+      head.type === 'guardGuess'
+        ? 3000
+        : head.type === 'kingSwap'
+          ? 2200
+          : 3300;
     const t = setTimeout(() => {
       setRevealQueue((q) => q.slice(1));
     }, duration);
     return () => clearTimeout(t);
   }, [revealQueue]);
+
+  // Vibration tactile au début de chaque tour humain (mobile).
+  // Déduplication par (round, turn) pour éviter de re-vibrer sur
+  // chaque mise à jour intermédiaire (Chancelière, etc.).
+  const lastVibratedTurnRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isHumanTurn) return;
+    if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return;
+    const turnId = `${state.roundNumber}-${state.turnNumber}-${humanId}`;
+    if (lastVibratedTurnRef.current === turnId) return;
+    lastVibratedTurnRef.current = turnId;
+    // Pattern visible : impulsion - pause - impulsion. Reste discret mais perceptible.
+    navigator.vibrate([55, 55, 55]);
+  }, [isHumanTurn, state.roundNumber, state.turnNumber, humanId]);
 
   const humanPlayable = useMemo(() => {
     if (!isHumanTurn || !hasDrawn) return [];

@@ -90,8 +90,8 @@ function SetupForm({ onStart }: { onStart: (s: Setup) => void }) {
             ))}
           </div>
           <p className="text-[11px] opacity-60 italic">
-            Toi + {count - 1} bot{count - 1 > 1 ? 's' : ''}. Seuil de victoire :{' '}
-            {count === 2 ? 7 : count === 3 ? 5 : 4} jeton{count > 2 ? 's' : ''}.
+            Toi + {count - 1} bot{count - 1 > 1 ? 's' : ''}. Premier à{' '}
+            <strong>3 manches gagnées</strong> remporte la partie.
           </p>
         </div>
 
@@ -143,7 +143,14 @@ function SoloGame({ setup, onExit }: { setup: Setup; onExit: () => void }) {
   }, []);
 
   const startNewRound = useCallback(() => {
-    setState((prev) => applyAction(prev, { kind: 'startNextRound', playerId: humanId }));
+    setState((prev) => {
+      try {
+        return applyAction(prev, { kind: 'startNextRound', playerId: humanId });
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Impossible de démarrer la manche');
+        return prev;
+      }
+    });
   }, []);
 
   const replay = useCallback(() => {
@@ -174,18 +181,8 @@ function SoloGame({ setup, onExit }: { setup: Setup; onExit: () => void }) {
     return () => clearTimeout(t);
   }, [state]);
 
-  // Vibration tactile au début de mon tour (mobile only)
-  useEffect(() => {
-    const current = state.players[state.currentPlayerIdx];
-    if (
-      current?.id === humanId &&
-      state.turnPhase === 'play' &&
-      typeof navigator !== 'undefined' &&
-      typeof navigator.vibrate === 'function'
-    ) {
-      navigator.vibrate(15);
-    }
-  }, [state.currentPlayerIdx, state.turnNumber, state.turnPhase, state.players]);
+  // Vibration tactile au début de mon tour : déplacée dans GameTable pour
+  // couvrir aussi le mode multijoueur.
 
   const showRoundEnd =
     state.lastRoundSummary !== null &&

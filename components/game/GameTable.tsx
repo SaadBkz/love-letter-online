@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'motion/react';
 import { ScrollText, HelpCircle } from 'lucide-react';
 import type { Action, CardKind, GameState, PlayerId, RevealEvent } from '@/lib/game';
 import {
@@ -57,9 +58,33 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
   const human = state.players.find((p) => p.id === humanId)!;
   const opponents = state.players.filter((p) => p.id !== humanId);
   const current = state.players[state.currentPlayerIdx]!;
-  const isHumanTurn = current.id === humanId && state.turnPhase === 'play';
-  const isHumanChancellor = current.id === humanId && state.turnPhase === 'resolvingChancellor';
-  const isBotTurn = !!current?.isBot && state.turnPhase === 'play' && !current.isEliminated;
+  // B2 : pendant `lastRoundSummary` (manche terminée), le `currentPlayerIdx`
+  // peut pointer sur un éliminé (notamment après auto-suicide Princesse).
+  // On fige `isHumanTurn` à false tant que la manche n'est pas relancée et
+  // que le joueur courant n'est pas éliminé.
+  const isHumanTurn =
+    current.id === humanId &&
+    state.turnPhase === 'play' &&
+    !state.lastRoundSummary &&
+    !current.isEliminated;
+  const isHumanChancellor =
+    current.id === humanId &&
+    state.turnPhase === 'resolvingChancellor' &&
+    !current.isEliminated;
+  // B11 + B14 : feedback "X joue / réfléchit" pour TOUS les joueurs distants
+  // (humains adverses en multi ou bots en solo), incluant la phase de
+  // résolution Chancelière (sinon la partie a l'air figée pendant que le
+  // joueur courant choisit l'ordre des cartes à remettre sous la pioche).
+  const isRemoteCurrent =
+    current.id !== humanId &&
+    !current.isEliminated &&
+    !state.lastRoundSummary &&
+    (state.turnPhase === 'play' || state.turnPhase === 'resolvingChancellor');
+  const remoteCurrentLabel = isRemoteCurrent
+    ? state.turnPhase === 'resolvingChancellor'
+      ? `${current.name} (Chancelière)`
+      : current.name
+    : null;
 
   const [pendingCard, setPendingCard] = useState<CardKind | null>(null);
   const [pendingTarget, setPendingTarget] = useState<PlayerId | null>(null);
@@ -83,6 +108,18 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
     return () => clearTimeout(t);
   }, [turnKey, state.turnPhase, state.gamePhase, state.lastRoundSummary, current.isBot, current.isEliminated, drawnTurnKey]);
 
+  // B4 : reset les states UI locaux (carte choisie, cible) dès que ce n'est
+  // plus mon tour ou qu'une manche se termine. Sinon le TargetPickerModal /
+  // GuardGuessModal restent ouverts si le tour change pendant l'interaction
+  // (refresh, élimination par un autre joueur via Pusher event, etc.).
+  useEffect(() => {
+    if (!isHumanTurn) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPendingCard(null);
+      setPendingTarget(null);
+    }
+  }, [isHumanTurn]);
+
   function handleDeckTap() {
     if (!isHumanTurn || hasDrawn) return;
     // La carte piochée est la 2ᵉ de la main dans notre état (auto-draw moteur).
@@ -98,10 +135,21 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
     }
   }
 
-  // Reveal bubble queue
-  const processedLogCountRef = useRef(state.log.length);
+  // Reveal bubble queue.
+  //
+  // B5 : on ne capture la longueur initiale du log qu'à la PREMIÈRE itération
+  // où on voit un state. Avant, `useRef(state.log.length)` se figeait à 0 si
+  // le composant montait avec un state vide (refresh très rapide en multi),
+  // puis tous les reveals d'historique étaient rejoués → spam de bulles.
+  const processedLogCountRef = useRef(-1);
   const [revealQueue, setRevealQueue] = useState<RevealEvent[]>([]);
   useEffect(() => {
+    if (processedLogCountRef.current === -1) {
+      // Premier tick utile : on saute tous les events déjà présents (refresh
+      // ou état initial) sans rejouer leurs reveals.
+      processedLogCountRef.current = state.log.length;
+      return;
+    }
     if (state.log.length <= processedLogCountRef.current) return;
     const newEntries = state.log.slice(processedLogCountRef.current);
     const newReveals: RevealEvent[] = [];
@@ -123,20 +171,25 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
   // Auto-dismiss reveal après une durée. Allongé pour laisser le temps de
   // voir l'animation complète (cartes → verdict décalé d'1.0–1.6s dans
   // RevealBubble.tsx).
+  //
+  // B12 : on dépend du HEAD de la queue, pas de la queue entière. Sinon
+  // chaque push (ajout en queue) re-firait le useEffect → cleanup l'ancien
+  // setTimeout et relançait un nouveau de zéro, faisant rester le head plus
+  // longtemps que prévu.
+  const revealHead = revealQueue[0] ?? null;
   useEffect(() => {
-    if (revealQueue.length === 0) return;
-    const head = revealQueue[0]!;
+    if (!revealHead) return;
     const duration =
-      head.type === 'guardGuess'
+      revealHead.type === 'guardGuess'
         ? 3000
-        : head.type === 'kingSwap'
+        : revealHead.type === 'kingSwap'
           ? 2200
           : 3300;
     const t = setTimeout(() => {
       setRevealQueue((q) => q.slice(1));
     }, duration);
     return () => clearTimeout(t);
-  }, [revealQueue]);
+  }, [revealHead]);
 
   // Vibration tactile au début de chaque tour humain (mobile).
   // Déduplication par (round, turn) pour éviter de re-vibrer sur
@@ -267,6 +320,17 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
         </div>
       </header>
 
+      {/* B3 + B13 : bandeau "À toi !" / "Tour de X" très visible, pour
+          que les joueurs sachent toujours au tour de qui c'est. */}
+      <TurnBanner
+        isHumanTurn={isHumanTurn}
+        isHumanChancellor={isHumanChancellor}
+        hasDrawn={hasDrawn}
+        currentName={current.name}
+        currentEliminated={current.isEliminated}
+        roundEnded={!!state.lastRoundSummary}
+      />
+
       {/* Zone adversaires — compact */}
       <section className="flex flex-col gap-1 px-2 py-1 shrink-0">
         {opponents.map((p, i) => {
@@ -287,7 +351,7 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
       <section className="flex-1 min-h-0 px-2 py-1">
         <GameLogFeed
           log={state.log}
-          thinkingBotName={isBotTurn ? current.name : null}
+          thinkingPlayerName={remoteCurrentLabel}
         />
       </section>
 
@@ -377,6 +441,71 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
 
       <LogDrawer open={logOpen} onClose={() => setLogOpen(false)} log={state.log} />
     </div>
+  );
+}
+
+function TurnBanner({
+  isHumanTurn,
+  isHumanChancellor,
+  hasDrawn,
+  currentName,
+  currentEliminated,
+  roundEnded,
+}: {
+  isHumanTurn: boolean;
+  isHumanChancellor: boolean;
+  hasDrawn: boolean;
+  currentName: string;
+  currentEliminated: boolean;
+  roundEnded: boolean;
+}) {
+  // Pendant `lastRoundSummary`, le RoundEndModal couvre tout : on n'affiche
+  // rien pour éviter une info contradictoire.
+  if (roundEnded) return null;
+
+  const isMine = isHumanTurn || isHumanChancellor;
+  const message = isHumanChancellor
+    ? 'À toi — choisis l\'ordre des cartes (Chancelière)'
+    : isHumanTurn
+      ? hasDrawn
+        ? 'À toi — choisis une carte à jouer'
+        : 'À toi — pioche une carte ↓'
+      : currentEliminated
+        ? 'En attente…'
+        : `Tour de ${currentName}`;
+
+  return (
+    <motion.div
+      key={isMine ? 'mine' : `other-${currentName}`}
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className="shrink-0 flex items-center justify-center px-3 py-1.5 border-b text-center font-display"
+      style={{
+        background: isMine
+          ? 'linear-gradient(180deg, rgba(201,169,110,0.28) 0%, rgba(201,169,110,0.12) 100%)'
+          : 'rgba(0,0,0,0.25)',
+        borderColor: isMine
+          ? 'var(--color-gold-bright)'
+          : 'rgba(201,169,110,0.18)',
+        color: isMine ? 'var(--color-gold-bright)' : 'var(--color-parchment)',
+        fontWeight: isMine ? 700 : 500,
+        fontSize: 13,
+        letterSpacing: '0.02em',
+        boxShadow: isMine ? '0 2px 12px rgba(230,200,138,0.18)' : 'none',
+      }}
+    >
+      {isMine ? (
+        <motion.span
+          animate={{ opacity: [0.85, 1, 0.85] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          {message}
+        </motion.span>
+      ) : (
+        <span>{message}</span>
+      )}
+    </motion.div>
   );
 }
 

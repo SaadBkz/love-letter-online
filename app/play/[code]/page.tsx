@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'sonner';
@@ -14,7 +14,11 @@ import {
   type RoomIdentity,
   type RoomView,
 } from '@/lib/online/client';
-import { subscribeRoom, disposePusherClient } from '@/lib/realtime/pusher-client';
+import {
+  subscribeRoom,
+  disposePusherClient,
+  bindConnectionState,
+} from '@/lib/realtime/pusher-client';
 import { GameTable } from '@/components/game/GameTable';
 import { RoundEndModal } from '@/components/game/modals/RoundEndModal';
 import { GameEndModal } from '@/components/game/modals/GameEndModal';
@@ -41,6 +45,30 @@ export default function OnlineRoomPage() {
     setIdentity(saved);
   }, [code, router]);
 
+  /**
+   * Re-fetch authoritatif. Compare la version avant de remplacer le state
+   * local : protection contre la race entre fetch initial et events Pusher
+   * arrivés en parallèle (B1), et utilisé aussi à chaque reconnexion Pusher
+   * pour combler les events manqués pendant une coupure (B15).
+   */
+  const refetch = useCallback(
+    async (id: RoomIdentity) => {
+      try {
+        const r = await fetchRoom(id);
+        // Toujours appliquer si la version reçue est ≥ que celle connue.
+        // Le strict `>` aurait raté un re-fetch après reconnexion où la
+        // version Redis n'a pas bougé mais notre state local est stale.
+        if (r.version >= versionRef.current) {
+          versionRef.current = r.version;
+          setRoom(r);
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Erreur');
+      }
+    },
+    [],
+  );
+
   // Polling initial pour récupérer l'état
   useEffect(() => {
     if (!identity) return;
@@ -48,8 +76,12 @@ export default function OnlineRoomPage() {
     fetchRoom(identity)
       .then((r) => {
         if (!alive) return;
-        setRoom(r);
-        versionRef.current = r.version;
+        // B1 : ne PAS écraser un state plus récent reçu via Pusher
+        // pendant que le fetch initial était en vol.
+        if (r.version >= versionRef.current) {
+          versionRef.current = r.version;
+          setRoom(r);
+        }
       })
       .catch((e) => alive && setError(e instanceof Error ? e.message : 'Erreur'));
     return () => {
@@ -57,12 +89,25 @@ export default function OnlineRoomPage() {
     };
   }, [identity]);
 
-  // Abonnement Pusher
+  // Abonnement Pusher + réconciliation à la reconnexion
   useEffect(() => {
     if (!identity) return;
     let channel: ReturnType<typeof subscribeRoom> | null = null;
+    let unbindConn: (() => void) | null = null;
     try {
       channel = subscribeRoom(identity);
+      // B15 : à chaque transition vers 'connected', re-fetch pour rattraper
+      // les events potentiellement perdus pendant la déconnexion.
+      // Ignore le tout premier 'connected' (le fetch initial s'en charge).
+      let firstConnect = true;
+      unbindConn = bindConnectionState(identity, (current) => {
+        if (current !== 'connected') return;
+        if (firstConnect) {
+          firstConnect = false;
+          return;
+        }
+        refetch(identity);
+      });
     } catch {
       return; // Pusher non configuré : on reste en mode polling minimal
     }
@@ -71,15 +116,7 @@ export default function OnlineRoomPage() {
       setRoom((prev) => (prev ? { ...prev, players: data.players } : prev));
     };
     const onGameStarted = () => {
-      // Pull state filtré
-      fetchRoom(identity)
-        .then((r) => {
-          if (r.version > versionRef.current) {
-            versionRef.current = r.version;
-            setRoom(r);
-          }
-        })
-        .catch(() => {});
+      refetch(identity);
     };
     const onRoomUpdated = (data: { state: GameState; version: number }) => {
       if (data.version > versionRef.current) {
@@ -99,8 +136,9 @@ export default function OnlineRoomPage() {
         channel.unbind_all();
         channel.unsubscribe();
       }
+      if (unbindConn) unbindConn();
     };
-  }, [identity]);
+  }, [identity, refetch]);
 
   useEffect(() => {
     return () => {
@@ -156,6 +194,11 @@ export default function OnlineRoomPage() {
       await submitAction(identity, action);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Action refusée');
+      // B6/B15 : si l'API rejette parce que notre state local est stale
+      // (event Pusher manqué, version désynchronisée), on re-fetch
+      // l'état autoritatif. Le joueur récupère un state à jour, le toast
+      // explique pourquoi son action a été refusée.
+      refetch(identity);
     }
   }
 
@@ -168,6 +211,7 @@ export default function OnlineRoomPage() {
       });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Erreur');
+      refetch(identity);
     }
   }
 
@@ -208,6 +252,7 @@ export default function OnlineRoomPage() {
           state={room.state}
           summary={room.state.lastRoundSummary}
           onNextRound={handleStartNextRound}
+          currentUserId={identity.playerId}
         />
       )}
       {showGameEnd && <GameEndModal open state={room.state} onReplay={handleReplay} />}

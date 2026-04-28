@@ -10,6 +10,7 @@ import {
   fetchRoom,
   startGame,
   submitAction,
+  markReadyForNextRound,
   clearIdentity,
   type RoomIdentity,
   type RoomView,
@@ -118,11 +119,23 @@ export default function OnlineRoomPage() {
     const onGameStarted = () => {
       refetch(identity);
     };
-    const onRoomUpdated = (data: { state: GameState; version: number }) => {
+    const onRoomUpdated = (data: {
+      state: GameState;
+      version: number;
+      nextRoundReady?: string[];
+    }) => {
       if (data.version > versionRef.current) {
         versionRef.current = data.version;
         setRoom((prev) =>
-          prev ? { ...prev, state: data.state, version: data.version, gameStarted: true } : prev,
+          prev
+            ? {
+                ...prev,
+                state: data.state,
+                version: data.version,
+                gameStarted: true,
+                nextRoundReady: data.nextRoundReady ?? [],
+              }
+            : prev,
         );
       }
     };
@@ -220,28 +233,28 @@ export default function OnlineRoomPage() {
     try {
       await submitAction(identity, action);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Action refusée');
+      const msg = e instanceof Error ? e.message : 'Action refusée';
+      // "Ce n'est pas le tour de X" sur double-tap mobile / state local
+      // stale : on swallow le toast (refetch derrière restaure l'état).
+      if (!msg.includes("Ce n'est pas le tour")) {
+        toast.error(msg);
+      }
       // Si l'API rejette parce que notre state local est stale (event
       // Pusher manqué, version désynchronisée), on re-fetch l'état
-      // autoritatif. Le joueur récupère un state à jour, le toast
-      // explique pourquoi son action a été refusée.
+      // autoritatif.
       refetch(identity);
     }
   }
 
-  async function handleStartNextRound() {
+  async function handleReadyForNextRound() {
     if (!identity) return;
     try {
-      await submitAction(identity, {
-        kind: 'startNextRound',
-        playerId: identity.playerId,
-      });
+      await markReadyForNextRound(identity);
+      // Pas besoin de refetch — l'API broadcast la mise à jour à tous les clients.
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Erreur';
-      // Race naturelle : plusieurs joueurs peuvent cliquer "Manche suivante".
-      // Le 1er gagne, les autres reçoivent 422 "Pas de manche à démarrer" car
-      // lastRoundSummary est déjà null. Du point de vue de l'utilisateur c'est
-      // un succès — on swallow le toast et on refetch pour récupérer le state.
+      // "Pas de manche à démarrer" = race où la manche a déjà avancé entre
+      // notre clic et l'arrivée serveur. Pas une vraie erreur.
       if (!msg.includes('Pas de manche à démarrer')) {
         toast.error(msg);
       }
@@ -267,7 +280,7 @@ export default function OnlineRoomPage() {
         state={room.state}
         humanId={identity.playerId}
         onAction={handleAction}
-        onStartNewRound={handleStartNextRound}
+        onStartNewRound={handleReadyForNextRound}
         onReplay={handleReplay}
       />
       <button
@@ -285,7 +298,9 @@ export default function OnlineRoomPage() {
           open
           state={room.state}
           summary={room.state.lastRoundSummary}
-          onNextRound={handleStartNextRound}
+          onNextRound={handleReadyForNextRound}
+          readyPlayers={room.nextRoundReady ?? []}
+          currentUserId={identity.playerId}
         />
       )}
       {showGameEnd && <GameEndModal open state={room.state} onReplay={handleReplay} />}

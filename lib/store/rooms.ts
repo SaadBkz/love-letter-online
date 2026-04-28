@@ -13,6 +13,13 @@ export interface Room {
   gameStarted: boolean;
   createdAt: number;
   version: number;
+  /**
+   * Coordination multi-joueur en fin de manche : tableau des playerIds qui
+   * ont cliqué "Je suis prêt". Quand `length === players.length`, le serveur
+   * applique `startNextRound` automatiquement et reset cette liste.
+   * Vide en dehors d'une fin de manche.
+   */
+  nextRoundReady?: PlayerId[];
 }
 
 const ROOM_TTL_SECONDS = 60 * 60 * 4; // 4h

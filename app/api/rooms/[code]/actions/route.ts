@@ -39,7 +39,10 @@ export async function POST(req: Request, context: { params: Promise<{ code: stri
 
     try {
       const nextState = applyAction(room.state, parsed.data.action);
-      return { ...room, state: nextState };
+      // Reset la liste readiness à chaque action de jeu : si on entre en
+      // fin de manche, c'est une liste fraîche ; si on en sort (startNextRound
+      // direct depuis le solo, par ex.), on nettoie aussi.
+      return { ...room, state: nextState, nextRoundReady: [] };
     } catch (e) {
       applyError = e instanceof Error ? e.message : 'Action refusée';
       return null;
@@ -66,6 +69,7 @@ export async function POST(req: Request, context: { params: Promise<{ code: stri
         await pusher.trigger(CHANNEL(code), `${EVENTS.roomUpdated}-${p.id}`, {
           state: view,
           version: updated.version,
+          nextRoundReady: updated.nextRoundReady ?? [],
         });
       } catch (err) {
         console.error(`pusher trigger failed for player ${p.id}`, err);

@@ -34,5 +34,6 @@ export async function GET(req: Request, context: { params: Promise<{ code: strin
     players: room.players.map((x) => ({ id: x.id, name: x.name })),
     state: room.state ? filterStateForPlayer(room.state, playerId) : null,
     version: room.version,
+    nextRoundReady: room.nextRoundReady ?? [],
   });
 }

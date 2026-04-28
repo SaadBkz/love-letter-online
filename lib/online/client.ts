@@ -85,6 +85,23 @@ export interface RoomView {
   players: Array<{ id: string; name: string }>;
   state: import('@/lib/game').GameState | null;
   version: number;
+  /** PlayerIds qui ont cliqué "Je suis prêt" en fin de manche. */
+  nextRoundReady: string[];
+}
+
+export async function markReadyForNextRound(identity: RoomIdentity): Promise<void> {
+  const res = await fetch(
+    `/api/rooms/${encodeURIComponent(identity.code)}/ready-next-round`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        playerId: identity.playerId,
+        sessionToken: identity.sessionToken,
+      }),
+    },
+  );
+  if (!res.ok) throw new Error((await res.json()).error ?? 'Impossible');
 }
 
 export async function fetchRoom(identity: RoomIdentity): Promise<RoomView> {
@@ -92,5 +109,13 @@ export async function fetchRoom(identity: RoomIdentity): Promise<RoomView> {
     `/api/rooms/${encodeURIComponent(identity.code)}?playerId=${encodeURIComponent(identity.playerId)}&sessionToken=${encodeURIComponent(identity.sessionToken)}`,
   );
   if (!res.ok) throw new Error((await res.json()).error ?? 'Salle indisponible');
-  return res.json();
+  const raw = (await res.json()) as Partial<RoomView> & {
+    code: string;
+    hostId: string;
+    gameStarted: boolean;
+    players: Array<{ id: string; name: string }>;
+    state: RoomView['state'];
+    version: number;
+  };
+  return { nextRoundReady: [], ...raw } as RoomView;
 }

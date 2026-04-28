@@ -136,7 +136,13 @@ function SoloGame({ setup, onExit }: { setup: Setup; onExit: () => void }) {
       try {
         return applyAction(prev, action);
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Action invalide');
+        const msg = err instanceof Error ? err.message : 'Action invalide';
+        // "Ce n'est pas le tour de X" arrive sur double-tap mobile (le 1er tap
+        // dispatche l'action, le 2nd arrive après que le state ait avancé).
+        // C'est un succès UX — on swallow silencieusement.
+        if (!msg.includes("Ce n'est pas le tour")) {
+          toast.error(msg);
+        }
         return prev;
       }
     });

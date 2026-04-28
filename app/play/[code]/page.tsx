@@ -234,14 +234,16 @@ export default function OnlineRoomPage() {
       await submitAction(identity, action);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Action refusée';
-      // "Ce n'est pas le tour de X" sur double-tap mobile / state local
-      // stale : on swallow le toast (refetch derrière restaure l'état).
-      if (!msg.includes("Ce n'est pas le tour")) {
+      // Double-tap mobile / state local stale : "pas le tour de X" /
+      // "joueur éliminé". Succès UX, on swallow. Comparaison lowercase
+      // pour résister aux variantes de ponctuation.
+      const lower = msg.toLowerCase();
+      const isStaleClick =
+        lower.includes('pas le tour') || lower.includes('joueur éliminé');
+      if (!isStaleClick) {
         toast.error(msg);
       }
-      // Si l'API rejette parce que notre state local est stale (event
-      // Pusher manqué, version désynchronisée), on re-fetch l'état
-      // autoritatif.
+      // Refetch dans tous les cas pour récupérer le state autoritatif.
       refetch(identity);
     }
   }
@@ -255,6 +257,27 @@ export default function OnlineRoomPage() {
       const msg = e instanceof Error ? e.message : 'Erreur';
       // "Pas de manche à démarrer" = race où la manche a déjà avancé entre
       // notre clic et l'arrivée serveur. Pas une vraie erreur.
+      if (!msg.includes('Pas de manche à démarrer')) {
+        toast.error(msg);
+      }
+      refetch(identity);
+    }
+  }
+
+  /**
+   * Force-advance pour gérer un joueur AFK qui bloquerait la salle. Dispatche
+   * directement `startNextRound` (la validation engine autorise n'importe
+   * quel joueur), bypassant le mécanisme de readiness.
+   */
+  async function handleForceNextRound() {
+    if (!identity) return;
+    try {
+      await submitAction(identity, {
+        kind: 'startNextRound',
+        playerId: identity.playerId,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Erreur';
       if (!msg.includes('Pas de manche à démarrer')) {
         toast.error(msg);
       }
@@ -301,6 +324,7 @@ export default function OnlineRoomPage() {
           onNextRound={handleReadyForNextRound}
           readyPlayers={room.nextRoundReady ?? []}
           currentUserId={identity.playerId}
+          onForceNextRound={handleForceNextRound}
         />
       )}
       {showGameEnd && <GameEndModal open state={room.state} onReplay={handleReplay} />}

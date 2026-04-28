@@ -137,10 +137,14 @@ function SoloGame({ setup, onExit }: { setup: Setup; onExit: () => void }) {
         return applyAction(prev, action);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Action invalide';
-        // "Ce n'est pas le tour de X" arrive sur double-tap mobile (le 1er tap
-        // dispatche l'action, le 2nd arrive après que le state ait avancé).
-        // C'est un succès UX — on swallow silencieusement.
-        if (!msg.includes("Ce n'est pas le tour")) {
+        // Double-tap mobile (le 1er tap dispatche, le 2nd arrive après que le
+        // state ait avancé) → "pas le tour de X" / "joueur éliminé". Succès UX,
+        // on swallow. Comparaison lowercase pour résister aux variantes de
+        // ponctuation (apostrophes droites/courbes, etc.).
+        const lower = msg.toLowerCase();
+        const isStaleClick =
+          lower.includes('pas le tour') || lower.includes('joueur éliminé');
+        if (!isStaleClick) {
           toast.error(msg);
         }
         return prev;

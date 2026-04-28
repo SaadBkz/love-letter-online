@@ -1,11 +1,14 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Check } from 'lucide-react';
 import type { GameState, RoundEndSummary } from '@/lib/game';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/game/Card';
+
+const FORCE_AVAILABLE_AFTER_MS = 30_000;
 
 export interface RoundEndModalProps {
   open: boolean;
@@ -27,6 +30,13 @@ export interface RoundEndModalProps {
   readyPlayers?: string[];
   /** Requis en mode multi pour savoir si l'utilisateur courant a cliqué. */
   currentUserId?: string;
+  /**
+   * Mode multi uniquement : appelé quand l'utilisateur clique "Forcer la
+   * manche". Doit dispatcher un `startNextRound` côté serveur sans attendre
+   * que les autres soient prêts (gère le cas AFK). Devient cliquable après
+   * 30 s d'attente.
+   */
+  onForceNextRound?: () => void;
 }
 
 const HAND_STAGGER = 0.32;
@@ -42,7 +52,23 @@ export function RoundEndModal({
   onNextRound,
   readyPlayers,
   currentUserId,
+  onForceNextRound,
 }: RoundEndModalProps) {
+  // Compteur de 30 s avant que le bouton "Forcer" devienne cliquable.
+  // Le ticker est ré-armé à chaque ouverture du modal (clé state.roundNumber).
+  const [secondsLeft, setSecondsLeft] = useState(
+    Math.ceil(FORCE_AVAILABLE_AFTER_MS / 1000),
+  );
+  useEffect(() => {
+    if (!open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSecondsLeft(Math.ceil(FORCE_AVAILABLE_AFTER_MS / 1000));
+    const interval = setInterval(() => {
+      setSecondsLeft((s) => (s > 0 ? s - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [open, state.roundNumber]);
+  const canForce = secondsLeft <= 0;
   const winnerNames = summary.winners
     .map((id) => state.players.find((p) => p.id === id)?.name)
     .filter(Boolean)
@@ -202,6 +228,7 @@ export function RoundEndModal({
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: buttonAt, duration: 0.3 }}
+          className="flex flex-col gap-2"
         >
           <Button
             onClick={onNextRound}
@@ -215,6 +242,21 @@ export function RoundEndModal({
                 : 'Je suis prêt'
               : 'Manche suivante'}
           </Button>
+
+          {/* Bouton "Forcer" — multi uniquement, dispo après 30 s pour gérer
+              les joueurs AFK qui ne cliqueraient jamais "Je suis prêt". */}
+          {isMultiMode && onForceNextRound && readyCount < totalCount && (
+            <Button
+              onClick={onForceNextRound}
+              className="w-full"
+              variant="ghost"
+              disabled={!canForce}
+            >
+              {canForce
+                ? 'Forcer la manche suivante (passer outre les non-prêts)'
+                : `Forcer la manche suivante… (${secondsLeft} s)`}
+            </Button>
+          )}
         </motion.div>
       </div>
     </Modal>

@@ -217,24 +217,38 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
     return hasCountess && hasKingOrPrince ? 'Countess' : null;
   }, [human.hand, isHumanTurn, hasDrawn]);
 
+  /**
+   * Debounce anti-double-tap : ref qui mémorise le `turnKey` pour lequel on a
+   * déjà dispatché une action. Si le user double-tap (ou tap-then-touch sur
+   * mobile), le 2ⁿᵈ click voit la même turnKey et est ignoré. Le ref se
+   * "reset" naturellement quand turnKey change (nouveau tour ou résolution
+   * Chancelière). Empêche à la source l'erreur "ce n'est pas le tour de X".
+   */
+  const lastDispatchedTurnRef = useRef<string | null>(null);
+  function tryDispatch(action: Action) {
+    if (lastDispatchedTurnRef.current === turnKey) return false;
+    lastDispatchedTurnRef.current = turnKey;
+    onAction(action);
+    return true;
+  }
+
   function handleCardSelect(card: CardKind) {
     if (!isHumanTurn || !hasDrawn) return;
     const needsTarget = CARD_REQUIRES_TARGET[card];
     if (!needsTarget) {
       if (card === 'Princess') {
-        // Confirmation suicide
         const ok = window.confirm(
           'Défausser la Princesse = élimination immédiate. Tu confirmes ?',
         );
         if (!ok) return;
       }
-      onAction({ kind: 'playCard', playerId: humanId, card });
+      tryDispatch({ kind: 'playCard', playerId: humanId, card });
       return;
     }
     const canSelf = CARD_CAN_TARGET_SELF[card];
     const opps = validOpponentTargets(state, humanId);
     if (opps.length === 0 && !canSelf) {
-      onAction({ kind: 'playCard', playerId: humanId, card });
+      tryDispatch({ kind: 'playCard', playerId: humanId, card });
       return;
     }
     setPendingCard(card);
@@ -246,7 +260,7 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
       setPendingTarget(targetId);
       return;
     }
-    onAction({
+    tryDispatch({
       kind: 'playCard',
       playerId: humanId,
       card: pendingCard,
@@ -258,7 +272,7 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
 
   function handleGuardGuess(guess: CardKind) {
     if (!pendingCard || !pendingTarget) return;
-    onAction({
+    tryDispatch({
       kind: 'playCard',
       playerId: humanId,
       card: pendingCard,
@@ -270,6 +284,11 @@ export function GameTable({ state, humanId, onAction }: GameTableProps) {
   }
 
   function handleChancellorResolve(keep: CardKind, bottom: CardKind[]) {
+    // Pour Chancelière le `turnKey` reste le même (turnPhase change mais pas
+    // le tuple round/turn/idx). On utilise donc une clé spéciale.
+    const chancellorKey = `${turnKey}-chancellor`;
+    if (lastDispatchedTurnRef.current === chancellorKey) return;
+    lastDispatchedTurnRef.current = chancellorKey;
     onAction({ kind: 'resolveChancellor', playerId: humanId, keep, bottom });
   }
 

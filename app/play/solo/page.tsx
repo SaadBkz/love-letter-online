@@ -157,7 +157,18 @@ function SoloGame({ setup, onExit }: { setup: Setup; onExit: () => void }) {
       try {
         return applyAction(prev, { kind: 'startNextRound', playerId: humanId });
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Impossible de démarrer la manche');
+        const msg = err instanceof Error ? err.message : 'Impossible de démarrer la manche';
+        // "Pas de manche à démarrer" = double-clic sur le bouton "Manche
+        // suivante" — la 1ʳᵉ click a déjà fait avancer le state, la 2ⁿᵈ
+        // est inoffensive. Pareil pour les races stale-state. On swallow.
+        const lower = msg.toLowerCase();
+        const isStaleClick =
+          lower.includes('pas de manche') ||
+          lower.includes('pas le tour') ||
+          lower.includes('partie est terminée');
+        if (!isStaleClick) {
+          toast.error(msg);
+        }
         return prev;
       }
     });

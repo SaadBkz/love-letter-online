@@ -11,6 +11,13 @@ export interface RoundEndModalProps {
   state: GameState;
   summary: RoundEndSummary;
   onNextRound: () => void;
+  /**
+   * Si fourni, n'active le bouton "Manche suivante" que pour ce joueur (B7).
+   * En multi, on passe l'id du joueur local : le bouton est désactivé pour
+   * les non-gagnants pour sérialiser le `startNextRound` côté serveur. En
+   * solo, on omet (ou passe undefined) : bouton toujours actif.
+   */
+  currentUserId?: string;
 }
 
 /**
@@ -28,7 +35,13 @@ const POST_HANDS_GAP = 0.45;
 const BONUS_GAP = 0.35;
 const BUTTON_GAP = 0.5;
 
-export function RoundEndModal({ open, state, summary, onNextRound }: RoundEndModalProps) {
+export function RoundEndModal({
+  open,
+  state,
+  summary,
+  onNextRound,
+  currentUserId,
+}: RoundEndModalProps) {
   const winnerNames = summary.winners
     .map((id) => state.players.find((p) => p.id === id)?.name)
     .filter(Boolean)
@@ -36,6 +49,11 @@ export function RoundEndModal({ open, state, summary, onNextRound }: RoundEndMod
   const bonusName = summary.spyBonusTo
     ? state.players.find((p) => p.id === summary.spyBonusTo)?.name
     : null;
+  // B7 : si currentUserId est fourni (multi), seul un gagnant peut cliquer.
+  // Solo : currentUserId omis → toujours autorisé.
+  const canStart =
+    currentUserId == null || summary.winners.includes(currentUserId);
+  const firstWinnerName = winnerNames.split(',')[0]?.trim() ?? '?';
 
   const handCount = state.players.length;
   const lastHandAt = HANDS_LEAD + (handCount - 1) * HAND_STAGGER;
@@ -132,8 +150,15 @@ export function RoundEndModal({ open, state, summary, onNextRound }: RoundEndMod
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: buttonAt, duration: 0.3 }}
         >
-          <Button onClick={onNextRound} className="w-full" variant="primary">
-            Manche suivante
+          <Button
+            onClick={onNextRound}
+            className="w-full"
+            variant="primary"
+            disabled={!canStart}
+          >
+            {canStart
+              ? 'Manche suivante'
+              : `En attente que ${firstWinnerName} démarre…`}
           </Button>
         </motion.div>
       </div>

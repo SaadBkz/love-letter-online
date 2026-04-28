@@ -53,14 +53,25 @@ export async function POST(req: Request, context: { params: Promise<{ code: stri
     return NextResponse.json({ error: 'État de salle incohérent' }, { status: 409 });
   }
 
+  // B6 : chaque trigger a son propre try/catch pour qu'une trigger en échec
+  // (rate limit Pusher, timeout) n'empêche pas les suivantes. Les triggers
+  // partent en parallèle pour réduire la latence. Si un client rate son
+  // event, le re-fetch côté client (handleAction error path + reconnect)
+  // sert de filet.
   if (isPusherConfigured() && updated.state) {
-    for (const p of updated.players) {
-      const view = filterStateForPlayer(updated.state, p.id);
-      await getPusher().trigger(CHANNEL(code), `${EVENTS.roomUpdated}-${p.id}`, {
-        state: view,
-        version: updated.version,
-      });
-    }
+    const pusher = getPusher();
+    const broadcasts = updated.players.map(async (p) => {
+      const view = filterStateForPlayer(updated.state!, p.id);
+      try {
+        await pusher.trigger(CHANNEL(code), `${EVENTS.roomUpdated}-${p.id}`, {
+          state: view,
+          version: updated.version,
+        });
+      } catch (err) {
+        console.error(`pusher trigger failed for player ${p.id}`, err);
+      }
+    });
+    await Promise.allSettled(broadcasts);
   }
 
   return NextResponse.json({ ok: true, version: updated.version });

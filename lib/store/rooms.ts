@@ -35,15 +35,21 @@ export async function deleteRoom(code: string): Promise<void> {
 }
 
 /**
- * Mise à jour atomique style optimistic-lock : on relit, on applique la transformation,
- * on refuse si la version a changé depuis le get.
+ * Mise à jour optimistic-lock : relit, applique la transformation, **vérifie
+ * que la version n'a pas bougé entre le read et le write**, retry si besoin.
  *
- * Simple : on utilise un petit wrapper avec retries. Upstash REST n'offre pas de MULTI/EXEC.
+ * Réduit la fenêtre de race par rapport à un read-then-write naïf, mais reste
+ * imparfait (TOCTOU entre le check et le SET). Upstash REST n'offre pas de
+ * MULTI/EXEC ; pour une vraie atomicité il faudrait un script Lua via `eval`.
+ *
+ * En pratique la contention est faible : les actions de jeu sont routées par
+ * joueur courant (un seul peut écrire), et `startNextRound` est restreint
+ * côté UI au gagnant de la manche pour sérialiser le clic.
  */
 export async function updateRoom(
   code: string,
   fn: (room: Room) => Room | null,
-  maxRetries = 3,
+  maxRetries = 5,
 ): Promise<Room | null> {
   for (let i = 0; i < maxRetries; i++) {
     const current = await getRoom(code);
@@ -51,8 +57,17 @@ export async function updateRoom(
     const next = fn(current);
     if (!next) return current;
     const updated: Room = { ...next, version: current.version + 1 };
-    // Note : pour une vraie atomicité, il faudrait CAS via Lua. Ici on s'appuie sur le fait que
-    // les actions de jeu sont routées par joueur courant (faible contention par salle).
+
+    // Re-read pour réduire la fenêtre de race : si la version a bougé entre
+    // notre read et maintenant, un autre writer a commit, on retry.
+    const reread = await getRoom(code);
+    if (!reread) return null;
+    if (reread.version !== current.version) {
+      // Petit backoff exponentiel + jitter pour éviter le thundering herd.
+      await new Promise((r) => setTimeout(r, 30 * (i + 1) + Math.random() * 20));
+      continue;
+    }
+
     await setRoom(updated);
     return updated;
   }

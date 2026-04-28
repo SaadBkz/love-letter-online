@@ -7,8 +7,13 @@ import { BotThinking } from './BotThinking';
 
 export interface GameLogFeedProps {
   log: LogEntry[];
-  /** Si non-null, rend une ligne « X réfléchit… » en bas du feed. */
-  thinkingBotName?: string | null;
+  /**
+   * Si non-null, rend une ligne « X réfléchit… » en bas du feed.
+   * Couvre les bots en solo ET les humains adverses en multi (tout joueur
+   * courant qui n'est pas l'utilisateur local), incluant la phase
+   * Chancellière (où le label peut inclure "(Chancelière)").
+   */
+  thinkingPlayerName?: string | null;
 }
 
 const KIND_COLOR: Record<LogEntryKind, string> = {
@@ -31,7 +36,7 @@ const KIND_BULLET: Record<LogEntryKind, string> = {
   reveal: '·',
 };
 
-export function GameLogFeed({ log, thinkingBotName }: GameLogFeedProps) {
+export function GameLogFeed({ log, thinkingPlayerName }: GameLogFeedProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastLenRef = useRef(log.length);
 
@@ -104,9 +109,9 @@ export function GameLogFeed({ log, thinkingBotName }: GameLogFeedProps) {
         )}
       </div>
 
-      {thinkingBotName && (
+      {thinkingPlayerName && (
         <div className="px-3 py-1.5 border-t" style={{ borderColor: 'rgba(201,169,110,0.18)' }}>
-          <BotThinking name={thinkingBotName} />
+          <BotThinking name={thinkingPlayerName} />
         </div>
       )}
     </div>

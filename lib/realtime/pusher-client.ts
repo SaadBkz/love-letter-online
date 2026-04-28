@@ -6,6 +6,14 @@ import type { RoomIdentity } from '@/lib/online/client';
 let instance: PusherClient | null = null;
 let currentIdentity: RoomIdentity | null = null;
 
+export type ConnectionState =
+  | 'initialized'
+  | 'connecting'
+  | 'connected'
+  | 'unavailable'
+  | 'failed'
+  | 'disconnected';
+
 /**
  * Crée (ou retourne) un client Pusher configuré avec l'identité donnée.
  * L'authorizer inclut playerId + sessionToken comme params de l'endpoint d'auth.
@@ -59,6 +67,25 @@ export function getPusherClient(identity: RoomIdentity): PusherClient {
 export function subscribeRoom(identity: RoomIdentity): Channel {
   const client = getPusherClient(identity);
   return client.subscribe(`private-room-${identity.code}`);
+}
+
+/**
+ * S'abonne aux changements d'état de connexion. Permet au consommateur de
+ * re-fetch l'état autoritatif après une coupure (Pusher events private ne
+ * sont pas bufferés, on rate les events pendant la déconnexion).
+ *
+ * @returns une fonction de désabonnement.
+ */
+export function bindConnectionState(
+  identity: RoomIdentity,
+  onChange: (state: ConnectionState, previousState: ConnectionState) => void,
+): () => void {
+  const client = getPusherClient(identity);
+  const handler = (states: { current: ConnectionState; previous: ConnectionState }) => {
+    onChange(states.current, states.previous);
+  };
+  client.connection.bind('state_change', handler);
+  return () => client.connection.unbind('state_change', handler);
 }
 
 export function disposePusherClient() {

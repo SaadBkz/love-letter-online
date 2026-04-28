@@ -146,6 +146,33 @@ export default function OnlineRoomPage() {
     };
   }, []);
 
+  /**
+   * Filet anti-désync : tant que la partie est démarrée, on poll en arrière-
+   * plan pour rattraper les events Pusher manqués (trigger en échec côté
+   * serveur, déconnexion brève sans state_change, network blip, etc.).
+   *
+   * Plus rapide pendant le RoundEndModal (transition critique où plusieurs
+   * joueurs attendent que quelqu'un clique "Manche suivante") ; plus lent
+   * pendant le jeu courant pour rester économe.
+   */
+  useEffect(() => {
+    if (!identity) return;
+    if (!room?.gameStarted) return;
+    const isAtRoundEnd =
+      !!room.state?.lastRoundSummary && room.state.gamePhase === 'playing';
+    const intervalMs = isAtRoundEnd ? 2500 : 8000;
+    const interval = setInterval(() => {
+      refetch(identity);
+    }, intervalMs);
+    return () => clearInterval(interval);
+  }, [
+    identity,
+    room?.gameStarted,
+    room?.state?.lastRoundSummary,
+    room?.state?.gamePhase,
+    refetch,
+  ]);
+
   if (error) {
     return (
       <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 p-6 text-center">
@@ -194,9 +221,9 @@ export default function OnlineRoomPage() {
       await submitAction(identity, action);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Action refusée');
-      // B6/B15 : si l'API rejette parce que notre state local est stale
-      // (event Pusher manqué, version désynchronisée), on re-fetch
-      // l'état autoritatif. Le joueur récupère un state à jour, le toast
+      // Si l'API rejette parce que notre state local est stale (event
+      // Pusher manqué, version désynchronisée), on re-fetch l'état
+      // autoritatif. Le joueur récupère un state à jour, le toast
       // explique pourquoi son action a été refusée.
       refetch(identity);
     }
@@ -210,7 +237,14 @@ export default function OnlineRoomPage() {
         playerId: identity.playerId,
       });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Erreur');
+      const msg = e instanceof Error ? e.message : 'Erreur';
+      // Race naturelle : plusieurs joueurs peuvent cliquer "Manche suivante".
+      // Le 1er gagne, les autres reçoivent 422 "Pas de manche à démarrer" car
+      // lastRoundSummary est déjà null. Du point de vue de l'utilisateur c'est
+      // un succès — on swallow le toast et on refetch pour récupérer le state.
+      if (!msg.includes('Pas de manche à démarrer')) {
+        toast.error(msg);
+      }
       refetch(identity);
     }
   }
@@ -252,7 +286,6 @@ export default function OnlineRoomPage() {
           state={room.state}
           summary={room.state.lastRoundSummary}
           onNextRound={handleStartNextRound}
-          currentUserId={identity.playerId}
         />
       )}
       {showGameEnd && <GameEndModal open state={room.state} onReplay={handleReplay} />}

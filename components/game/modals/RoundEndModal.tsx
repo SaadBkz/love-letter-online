@@ -11,13 +11,6 @@ export interface RoundEndModalProps {
   state: GameState;
   summary: RoundEndSummary;
   onNextRound: () => void;
-  /**
-   * Si fourni, n'active le bouton "Manche suivante" que pour ce joueur (B7).
-   * En multi, on passe l'id du joueur local : le bouton est désactivé pour
-   * les non-gagnants pour sérialiser le `startNextRound` côté serveur. En
-   * solo, on omet (ou passe undefined) : bouton toujours actif.
-   */
-  currentUserId?: string;
 }
 
 /**
@@ -40,7 +33,6 @@ export function RoundEndModal({
   state,
   summary,
   onNextRound,
-  currentUserId,
 }: RoundEndModalProps) {
   const winnerNames = summary.winners
     .map((id) => state.players.find((p) => p.id === id)?.name)
@@ -49,11 +41,12 @@ export function RoundEndModal({
   const bonusName = summary.spyBonusTo
     ? state.players.find((p) => p.id === summary.spyBonusTo)?.name
     : null;
-  // B7 : si currentUserId est fourni (multi), seul un gagnant peut cliquer.
-  // Solo : currentUserId omis → toujours autorisé.
-  const canStart =
-    currentUserId == null || summary.winners.includes(currentUserId);
-  const firstWinnerName = winnerNames.split(',')[0]?.trim() ?? '?';
+  // Le bouton est actif pour TOUT le monde : `validateAction` (validation.ts)
+  // autorise explicitement n'importe quel joueur à déclencher la manche
+  // suivante, indépendamment du tour ou de l'élimination. La race entre deux
+  // clics simultanés est gérée côté API par updateRoom (re-read avant write,
+  // retries) et côté client par swallow silencieux du 422 "Pas de manche à
+  // démarrer" qui signifie "quelqu'un d'autre a cliqué en premier".
 
   const handCount = state.players.length;
   const lastHandAt = HANDS_LEAD + (handCount - 1) * HAND_STAGGER;
@@ -154,11 +147,8 @@ export function RoundEndModal({
             onClick={onNextRound}
             className="w-full"
             variant="primary"
-            disabled={!canStart}
           >
-            {canStart
-              ? 'Manche suivante'
-              : `En attente que ${firstWinnerName} démarre…`}
+            Manche suivante
           </Button>
         </motion.div>
       </div>

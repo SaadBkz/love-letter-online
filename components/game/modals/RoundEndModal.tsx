@@ -69,6 +69,28 @@ export function RoundEndModal({
     return () => clearInterval(interval);
   }, [open, state.roundNumber]);
   const canForce = secondsLeft <= 0;
+
+  // Debounce des boutons d'action : une fois cliqué, on les désactive
+  // immédiatement pour empêcher le double-tap mobile (qui ferait dispatcher
+  // 2 fois `startNextRound` ou `markReady` en très peu de temps, le 2ⁿᵈ
+  // dispatch tombant sur un state déjà avancé → toast "Pas de manche à
+  // démarrer"). Reset quand le modal se rouvre (nouvelle manche).
+  const [submitting, setSubmitting] = useState<'next' | 'force' | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSubmitting(null);
+  }, [open, state.roundNumber]);
+  function handleNextRoundClick() {
+    if (submitting) return;
+    setSubmitting('next');
+    onNextRound();
+  }
+  function handleForceClick() {
+    if (submitting) return;
+    setSubmitting('force');
+    onForceNextRound?.();
+  }
   const winnerNames = summary.winners
     .map((id) => state.players.find((p) => p.id === id)?.name)
     .filter(Boolean)
@@ -231,30 +253,36 @@ export function RoundEndModal({
           className="flex flex-col gap-2"
         >
           <Button
-            onClick={onNextRound}
+            onClick={handleNextRoundClick}
             className="w-full"
             variant="primary"
-            disabled={meIsReady}
+            disabled={meIsReady || submitting !== null}
           >
             {isMultiMode
               ? meIsReady
                 ? `En attente des autres (${readyCount}/${totalCount})…`
-                : 'Je suis prêt'
-              : 'Manche suivante'}
+                : submitting === 'next'
+                  ? 'Envoi…'
+                  : 'Je suis prêt'
+              : submitting === 'next'
+                ? 'Démarrage…'
+                : 'Manche suivante'}
           </Button>
 
           {/* Bouton "Forcer" — multi uniquement, dispo après 30 s pour gérer
               les joueurs AFK qui ne cliqueraient jamais "Je suis prêt". */}
           {isMultiMode && onForceNextRound && readyCount < totalCount && (
             <Button
-              onClick={onForceNextRound}
+              onClick={handleForceClick}
               className="w-full"
               variant="ghost"
-              disabled={!canForce}
+              disabled={!canForce || submitting !== null}
             >
-              {canForce
-                ? 'Forcer la manche suivante (passer outre les non-prêts)'
-                : `Forcer la manche suivante… (${secondsLeft} s)`}
+              {submitting === 'force'
+                ? 'Envoi…'
+                : canForce
+                  ? 'Forcer la manche suivante (passer outre les non-prêts)'
+                  : `Forcer la manche suivante… (${secondsLeft} s)`}
             </Button>
           )}
         </motion.div>
